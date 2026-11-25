@@ -1,8 +1,8 @@
 {
     "version": "7.2.0",
     "projectId": "23ef25f50e3eb3042a0d3dedc5369aca",
-    "applicationID": 43305,
-    "creativeName": "",
+    "applicationID": 32681,
+    "creativeName": "PA_TileWord",
     "pgServer": "EU",
     "window": {
         "‐⁘": true
@@ -8693,7 +8693,7 @@
                     },
                     {
                         "name": "clip32",
-                        "excluded": true
+                        "excluded": false
                     },
                     {
                         "name": "clipu32",
@@ -13967,7 +13967,7 @@
                     },
                     {
                         "name": "Next$2",
-                        "excluded": true
+                        "excluded": false
                     },
                     {
                         "name": "Next$1",
@@ -21859,7 +21859,7 @@
                     },
                     {
                         "name": "Range",
-                        "excluded": true
+                        "excluded": false
                     },
                     {
                         "name": "InitState",
@@ -31377,11 +31377,11 @@
                     },
                     {
                         "name": "WordsToShowCta",
-                        "excluded": true
+                        "excluded": false
                     },
                     {
                         "name": "RefillBoard",
-                        "excluded": true
+                        "excluded": false
                     }
                 ]
             },

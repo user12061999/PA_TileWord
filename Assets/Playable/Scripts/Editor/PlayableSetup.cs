@@ -79,7 +79,7 @@ namespace PA.TileWord.EditorTools
                 TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
                 if (importer == null) continue;
 
-                bool big = path.EndsWith("InGameBg.png") || path.EndsWith("TitleLogo.png") || path.EndsWith("StageInfoPanel-no-timer.png");
+                bool big = path.EndsWith("InGameBg.png") || path.EndsWith("TitleLogo.png") || path.EndsWith("StageInfoPanel-no-timer.png") || path.EndsWith("PlayButton.png");
                 int maxSize = big ? 1024 : 256;
 
                 bool changed = false;
@@ -181,14 +181,20 @@ namespace PA.TileWord.EditorTools
             game.slotSprite = LoadSprite("LetterTray");
             game.headerSprite = LoadSprite("StageInfoPanel-no-timer");
             game.logoSprite = LoadSprite("TitleLogo");
-            game.buttonSprite = LoadSprite("CommonButtpnGreen");
+            game.buttonSprite = LoadSprite("PlayButton");
             game.handSprite = LoadSprite("Tutorial_Focus_Icon_Hand");
             game.sparkleSprite = LoadSprite("UnlockSparkle");
             game.font = font;
+            game.music = LoadClip("music_main");
             game.sfxTap = LoadClip("tile click");
             game.sfxWrong = LoadClip("tile click blocked");
-            game.sfxWord = LoadClip("merge sound");
+            game.sfxWoodLand = LoadClip("crate crack");
+            game.sfxHeaderDrop = LoadClip("rubber quick");
+            game.sfxStreak = LoadClip("power up");
+            game.sfxSlotFill = LoadClip("coin pickup");
+            game.sfxWord = LoadClip("coins reward");
             game.sfxWin = LoadClip("level complete");
+            game.sfxButton = LoadClip("ui_button_1");
 
             EditorSceneManager.SaveScene(scene, ScenePath);
 
