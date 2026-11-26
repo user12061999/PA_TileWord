@@ -8,8 +8,13 @@ using UnityEngine.UI;
 namespace PA.TileWord
 {
     /// <summary>
-    /// Playable Tile Word Explorer: Intro -> Tutorial (từ đầu tiên) -> Free play (các từ còn lại) -> End card.
-    /// Danh sách từ, chủ đề, fill board và số từ để hiện CTA chỉnh được trong Luna Playground.
+    /// Playable Tile Word Explorer v2.
+    /// Header hiển thị chủ đề + dòng từ (PEAR LIME MELON MANGO), dài quá thì xuống dòng.
+    /// - Chọn chữ có trong bất kỳ từ nào chưa đủ (không cần thứ tự): ô chữ bay về dòng từ kèm vệt sáng.
+    /// - Chọn sai: màn hình nháy đỏ, hiện dấu X đỏ, ô chữ rơi vào khay (7 ô).
+    /// - Mỗi từ hoàn thành sáng 1 ngôi sao trên thanh tiến trình. Đủ sao -> hỏi chơi cấp khó hơn.
+    /// - Khay đầy 7 ô (hoặc hết giờ) -> hỏi thử lại.
+    /// - Thanh dưới cùng (logo + tên app + PLAY NOW) hiển thị suốt từ đầu đến cuối.
     /// Toàn bộ UI dựng bằng code (uGUI + TextMeshPro), chỉ dùng API Unity mà Luna Playworks hỗ trợ.
     /// </summary>
     public class PlayableGame : MonoBehaviour
@@ -18,95 +23,134 @@ namespace PA.TileWord
         public Sprite backgroundSprite;
         public Sprite tileSprite;
         public Sprite slotSprite;
-        public Sprite headerSprite;
+        public Sprite headerTopSprite;     // StageInfoPanel tím: phần trên (tab level/timer, dải chủ đề, nửa trên dải kem)
+        public Sprite headerMidSprite;     // dải 1px giữa dải kem, kéo dài khi dòng từ xuống nhiều dòng
+        public Sprite headerBottomSprite;  // phần dưới dải kem + viền đáy
         public Sprite logoSprite;
         public Sprite buttonSprite;
+        public Sprite hardButtonSprite;
         public Sprite handSprite;
         public Sprite sparkleSprite;
+        public Sprite starOnSprite;
+        public Sprite starOffSprite;
+        public Sprite crossSprite;       // cross.png (trắng, tô đỏ trong code)
+        public Sprite pillSprite;        // TrayWarningBar: ô bo tròn trắng, dùng kiểu Sliced
+        public Sprite flashEdgesSprite;  // TrayWarningEdges: viền màn hình khi chọn sai
+        public Sprite trayWarningSprite;
+        public Sprite winPanelSprite;
+        public Sprite losePanelSprite;
+        public Sprite loseIconSprite;
 
         [Header("Font")]
         public TMP_FontAsset font;
 
         [Header("Audio")]
         public AudioClip music;          // music_main: nhạc nền lặp
-        public AudioClip sfxTap;         // tile click: chọn / bỏ chọn chữ
+        public AudioClip sfxTap;         // tile click: chọn đúng chữ
         public AudioClip sfxWrong;       // tile click blocked: chọn sai
-        public AudioClip sfxWoodLand;    // crate crack: mảnh gỗ chạm chỗ (intro, fill board)
+        public AudioClip sfxWoodLand;    // crate crack: mảnh gỗ chạm chỗ / rơi vào khay
         public AudioClip sfxHeaderDrop;  // rubber quick: header trượt xuống
-        public AudioClip sfxStreak;      // power up: vệt sáng khi ghép đủ từ
-        public AudioClip sfxSlotFill;    // coin pickup: chữ bay vào ô card
-        public AudioClip sfxWord;        // coins reward: card hoàn thành
-        public AudioClip sfxWin;         // level complete: hiện end card
-        public AudioClip sfxButton;      // ui_button_1: bấm Continue / CTA
+        public AudioClip sfxStreak;      // power up: ngôi sao sáng
+        public AudioClip sfxSlotFill;    // coin pickup: chữ bay vào dòng từ
+        public AudioClip sfxWord;        // coins reward: hoàn thành 1 từ
+        public AudioClip sfxWin;         // level complete: popup kết thúc
+        public AudioClip sfxButton;      // ui_button_1: bấm CTA
 
         [Range(0f, 1f)] public float musicVolume = 0.45f;
 
         [Header("Tuning")]
-        public float introDuration = 1.5f;
-        [Tooltip("Sau tutorial, bàn tay gợi ý chỉ hiện lại khi người chơi không tương tác trong khoảng này (giây).")]
-        public float idleHintDelay = 6f;
+        public float introDuration = 1.4f;
+        [Tooltip("Sau từ đầu tiên, bàn tay gợi ý chỉ hiện lại khi người chơi không tương tác trong khoảng này (giây).")]
+        public float idleHintDelay = 5f;
 
         [Header("Luna Playground")]
-        [LunaPlaygroundField("Words (first = tutorial)", 0, "Words")]
+        [LunaPlaygroundField("Category title", 0, "Words")]
+        public string categoryTitle = "FRUITS";
+
+        [LunaPlaygroundField("Words (in order)", 1, "Words")]
         [LunaPlaygroundFieldArrayLength(1, MaxWords)]
-        [Tooltip("Danh sách từ cần tìm (tối đa 8, mỗi từ 2–9 chữ A–Z). Từ đầu tiên dùng cho tutorial.")]
-        public string[] words = { "CAT", "DOG", "FISH", "BIRD", "BUNNY", "TURTLE" };
+        [Tooltip("Các từ hiện trên header (tối đa 5, mỗi từ 2–8 chữ A–Z). Chữ có trong từ nào cũng được, không cần thứ tự.")]
+        public string[] words = { "PEAR", "LIME", "MELON", "MANGO" };
 
-        [LunaPlaygroundField("Refill board after a word", 0, "Gameplay")]
-        [Tooltip("Sau khi clear 1 từ: các ô phía trên rơi xuống lấp chỗ trống và chữ mới rơi từ trên vào.")]
-        public bool refillBoard = true;
-
-        [LunaPlaygroundField("Words completed to show CTA", 1, "Gameplay")]
+        [LunaPlaygroundField("Words to win (stars)", 0, "Gameplay")]
         [LunaPlaygroundFieldStep(1)]
         [Range(1, MaxWords)]
-        [Tooltip("Số từ (tính cả từ tutorial) người chơi cần hoàn thành thì hiện end card. 1 = ngay sau tutorial.")]
-        public int wordsToShowCta = 3;
+        [Tooltip("Số từ cần hoàn thành (từ nào cũng được) = số sao trên thanh tiến trình.")]
+        public int wordsToWin = 3;
 
-        // ---------------------------------------------------------------- data
+        [LunaPlaygroundField("Level number", 1, "Gameplay")]
+        [LunaPlaygroundFieldStep(1)]
+        public int levelNumber = 20;
+
+        [LunaPlaygroundField("Time limit (seconds)", 2, "Gameplay")]
+        [LunaPlaygroundFieldStep(1)]
+        [Range(20, 600)]
+        public int timeLimit = 180;
+
+        // ---------------------------------------------------------------- layout constants
         private const float RefWidth = 1080f;
         private const float RefHeight = 1920f;
-        private const int GridSize = 10;
-        private const float CellW = 98f;
-        private const float CellH = 100f;
-        private const float TileW = 92f;
-        private const float TileH = 100f;
-        private const int MaxWords = 8;
-        private const int MinWordLength = 2;
-        private const int MaxWordLength = 9;
-        private const int MaxTotalLetters = 60;
-        private const int BoardSeed = 20261124;
-        private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        private const string FallbackFiller = "BEJKLMNPQRUVWYZ";
-        private static readonly string[] DefaultWords = { "CAT", "DOG", "FISH" };
 
-        // Danh sách từ đã chuẩn hoá từ config (in hoa, chỉ A–Z). Từ 0 là tutorial.
-        private string[] _words;
-        private int[][] _wordCounts;
-        // Chữ "nhiễu" lấp board: các chữ không xuất hiện trong bất kỳ từ nào để người chơi không bị nhầm.
-        private string _filler;
-        private float _slotSize = 60f;
-        private float _cardsHeight;
-        private RectTransform _cardStrip;
-        private List<int> _cardOrder;
-        private int _layoutVersion;
-        private float _messageY = -650f;
+        private const int Cols = 7;
+        private const int Rows = 6;
+        private const float CellW = 138f;
+        private const float CellH = 142f;
+        private const float TileW = 128f;
+        private const float TileH = 139f;
+        private const float TileFont = 84f;
+
+        private const int TraySize = 7;
+        private const float TraySlot = 122f;
+        private const float TrayGap = 12f;
+
+        private const float HeaderW = 1000f;
+        private const float HeaderH = HeaderW * 414f / 1080f;
+        private const float HeaderScale = HeaderW / 1080f;
+        private const float HeaderTop = 810f;
+        // Ảnh header 1080x414 cắt ở hàng 334 (giữa dải kem 290..378).
+        private const float HeaderSplitPx = 334f;
+        // Đáy board thấp nhất để ô thông báo không chạm thanh CTA dưới cùng.
+        private const float MinBoardBottom = -655f;
+        private const float StarBarY = 880f;
+        private const float StarSpacing = 112f;
+        private const float BottomBarHeight = 190f;
+
+        private const float LineFont = 62f;
+        private const float LineMaxWidth = 860f;
+        private const float LineSpacing = LineFont * 1.12f;
+        // Thu nhỏ dòng từ tối đa tới mức này trước khi xuống dòng.
+        private const float MinLineScale = 0.9f;
+        private const float LineTracking = 3f;
+
+        private const int MaxWords = 5;
+        private const int MinWordLength = 2;
+        private const int MaxWordLength = 8;
+        private const int BoardSeed = 20261125;
+        private const string ExtraDecoys = "BCDGHKSTUY";
+        private static readonly string[] DefaultWords = { "PEAR", "LIME", "MELON", "MANGO" };
+
+        // Độ rộng chữ in hoa Nunito Black (em = 100), đo từ file TTF: dàn dòng từ không phụ thuộc TMP layout.
+        private static readonly float[] LetterAdvance =
+        {
+            76f, 70f, 69f, 79f, 61f, 57f, 75f, 78f, 30f, 39f, 71f, 58f, 89f,
+            76f, 82f, 67f, 82f, 70f, 65f, 65f, 75f, 74f, 113f, 70f, 65f, 63f,
+        };
 
         private static readonly Color Brown = new Color32(107, 58, 30, 255);
-        private static readonly Color FoundSlotColor = new Color(0.78f, 0.95f, 0.55f, 1f);
+        private static readonly Color PendingColor = new Color(0.42f, 0.23f, 0.12f, 0.28f);
+        private static readonly Color IncomingColor = new Color(0.42f, 0.23f, 0.12f, 0.5f);
+        private static readonly Color WordDoneColor = new Color32(58, 150, 40, 255);
         private static readonly Color StreakColor = new Color(1f, 0.93f, 0.55f, 0.95f);
+        private static readonly Color TrailColor = new Color(1f, 0.97f, 0.75f, 0.85f);
+        private static readonly Color OutlinePurple = new Color32(70, 14, 105, 255);
 
         private enum Phase { Intro, Tutorial, Free, End }
 
-        private class WordCard
-        {
-            public RectTransform Rect;
-            public Image[] Slots;
-            public TextMeshProUGUI[] Labels;
-            public bool Found;
-            public CanvasGroup Group;
-        }
-
         // ---------------------------------------------------------------- runtime
+        private string[] _words;
+        private int _target;
+        private string _decoys;
+
         private RectTransform _canvasRect;
         private CanvasScaler _scaler;
         private RectTransform _background;
@@ -114,29 +158,57 @@ namespace PA.TileWord
         private RectTransform _rootTop;
         private RectTransform _header;
         private RectTransform _board;
-        private RectTransform _focusLayer;
+        private RectTransform _trayLayer;
+        private RectTransform _starBar;
         private RectTransform _fxLayer;
         private RectTransform _hand;
-        private CanvasGroup _overlay;
-        private TextMeshProUGUI _message;
+        private RectTransform _bottomBar;
+        private RectTransform _ctaButton;
+        private Image _flash;
+        private Image _flashEdges;
         private CanvasGroup _messageGroup;
+        private TextMeshProUGUI _message;
+        private TextMeshProUGUI _timerText;
+
+        private RectTransform _wordLine;
+        private float _lineScale = 1f;
+        private List<List<int>> _lines;
+        private float _headerExtra;
+        private float _trayY;
+        private float _boardTop;
+        private float _boardScale = 1f;
+        private float _messageY;
+        private TextMeshProUGUI[][] _lineLabels;
+
+        private Image[] _traySlots;
+        private Image[] _trayWarnings;
+        private Image[] _stars;
+
         private const int SfxVoices = 8;
         private AudioSource[] _sfxSources;
         private int _nextSfx;
         private AudioSource _music;
+        private float _lastLandSfx = -1f;
 
         private LetterTile[,] _tiles;
-        private LetterTile[][] _wordTiles;
-        private WordCard[] _cards;
-        private readonly List<LetterTile> _selection = new List<LetterTile>();
 
         private Phase _phase = Phase.Intro;
+        private bool[][] _slotTaken;
+        private int[] _assigned;
+        private int _completedWords;
+        private int _starsLit;
+        private int[] _landed;
         private int _foundCount;
+        private int _trayCount;
         private int _flyingLetters;
-        private int _refilling;
+        private bool _lost;
+        private bool _timeUp;
+        private float _timeLeft;
+        private int _shownSeconds = -1;
         private float _idleTime;
         private RectTransform _handTarget;
         private Coroutine _handLoop;
+        private int _flashVersion;
         private bool _storeOpened;
 
         // ================================================================ lifecycle
@@ -144,15 +216,18 @@ namespace PA.TileWord
         {
             Application.targetFrameRate = 60;
             PrepareWords();
+            PrepareLineLayout();
+            ComputeLayout();
             SetupAudio();
 
             EnsureEventSystem();
             BuildCanvas();
-            BuildHeader();
             BuildBoard();
-            // Header vẽ đè lên board: chữ mới (fill) và mảnh gỗ intro rơi xuống từ phía sau header.
-            _header.SetAsLastSibling();
+            BuildTray();
+            BuildHeader();
+            BuildStarBar();
             BuildTopLayers();
+            BuildBottomBar();
             UpdateLayout();
 
             StartCoroutine(Flow());
@@ -161,9 +236,20 @@ namespace PA.TileWord
         private void Update()
         {
             UpdateLayout();
-            UpdateCardClipping();
 
-            if (_phase == Phase.Free && _handTarget == null && _flyingLetters == 0 && _refilling == 0)
+            if (_phase == Phase.Tutorial || _phase == Phase.Free)
+            {
+                _timeLeft -= Time.deltaTime;
+                if (_timeLeft <= 0f)
+                {
+                    _timeLeft = 0f;
+                    _timeUp = true;
+                    Lose();
+                }
+                UpdateTimerText();
+            }
+
+            if (_phase == Phase.Free && _handTarget == null)
             {
                 _idleTime += Time.deltaTime;
                 if (_idleTime >= idleHintDelay)
@@ -172,54 +258,56 @@ namespace PA.TileWord
                     if (next != null) ShowHand(next.Rect);
                 }
             }
-        }
 
-        /// <summary>Số từ phải hoàn thành để hiện CTA, kẹp trong [1, số từ] (từ tutorial tính là 1).</summary>
-        private int WordsToShowCta()
-        {
-            return Mathf.Clamp(wordsToShowCta, 1, _words.Length);
+            float now = Time.time;
+            if (_trayWarnings != null)
+            {
+                bool warn = _trayCount >= TraySize - 2;
+                float a = 0.55f + Mathf.Sin(now * 8f) * 0.45f;
+                for (int i = 0; i < _trayWarnings.Length; i++)
+                {
+                    if (_trayWarnings[i].enabled != warn) _trayWarnings[i].enabled = warn;
+                    if (warn) _trayWarnings[i].color = new Color(1f, 1f, 1f, a);
+                }
+            }
+
+            if (_ctaButton != null)
+            {
+                float s = 1f + Mathf.Sin(now * 5f) * 0.05f;
+                _ctaButton.localScale = new Vector3(s, s, 1f);
+            }
         }
 
         // ================================================================ words config
-        /// <summary>Chuẩn hoá danh sách từ từ Luna: in hoa, chỉ giữ A–Z, bỏ từ quá ngắn/dài, tối đa 8 từ và 60 chữ.</summary>
+        /// <summary>Chuẩn hoá danh sách từ từ Luna: in hoa, chỉ giữ A–Z, bỏ từ quá ngắn/dài, tối đa 5 từ.</summary>
         private void PrepareWords()
         {
             List<string> list = new List<string>();
-            int totalLetters = 0;
             if (words != null)
             {
                 for (int i = 0; i < words.Length && list.Count < MaxWords; i++)
                 {
                     string clean = CleanWord(words[i]);
                     if (clean.Length < MinWordLength || clean.Length > MaxWordLength) continue;
-                    if (totalLetters + clean.Length > MaxTotalLetters) continue;
                     if (list.Contains(clean)) continue;
                     list.Add(clean);
-                    totalLetters += clean.Length;
                 }
             }
             if (list.Count == 0)
             {
-                Debug.LogWarning("[Playable] Danh sách từ trống/không hợp lệ, dùng mặc định CAT, DOG, FISH.");
+                Debug.LogWarning("[Playable] Danh sách từ trống/không hợp lệ, dùng mặc định.");
                 for (int i = 0; i < DefaultWords.Length; i++) list.Add(DefaultWords[i]);
             }
             _words = list.ToArray();
-            _wordCounts = new int[_words.Length][];
-            for (int w = 0; w < _words.Length; w++) _wordCounts[w] = LetterCounts(_words[w]);
+            _target = Mathf.Clamp(wordsToWin, 1, _words.Length);
+            _landed = new int[_words.Length];
+            _assigned = new int[_words.Length];
+            _slotTaken = new bool[_words.Length][];
+            for (int w = 0; w < _words.Length; w++) _slotTaken[w] = new bool[_words[w].Length];
 
-            _filler = "";
-            for (int i = 0; i < Alphabet.Length; i++)
-            {
-                char ch = Alphabet[i];
-                bool inWord = false;
-                for (int w = 0; w < _words.Length && !inWord; w++)
-                {
-                    if (_words[w].IndexOf(ch) >= 0) inWord = true;
-                }
-                if (!inWord) _filler += ch;
-            }
-            // Bộ từ dùng gần hết bảng chữ cái: chấp nhận chữ nhiễu trùng với chữ trong từ.
-            if (_filler.Length < 4) _filler = FallbackFiller;
+            // Chữ lấp board: phần lớn là chữ có trong các từ (dễ nhầm thứ tự) + vài chữ nhiễu khác.
+            _decoys = ExtraDecoys;
+            for (int w = 0; w < _words.Length; w++) _decoys += _words[w];
         }
 
         private static string CleanWord(string raw)
@@ -235,162 +323,144 @@ namespace PA.TileWord
             return clean;
         }
 
-        private static int[] LetterCounts(string s)
+        /// <summary>
+        /// Ô còn trống cho chữ <paramref name="ch"/>: ưu tiên từ gần xong nhất (ít ô trống nhất), hoà thì từ đứng trước.
+        /// Không cần đúng thứ tự: chữ có trong bất kỳ từ nào chưa đủ đều hợp lệ.
+        /// </summary>
+        private bool FindSlot(char ch, out int word, out int index)
         {
-            int[] counts = new int[26];
-            for (int i = 0; i < s.Length; i++) counts[s[i] - 'A']++;
-            return counts;
-        }
-
-        /// <summary>Đúng nếu mọi chữ trong <paramref name="part"/> đều có đủ số lượng trong <paramref name="whole"/>.</summary>
-        private static bool IsSubset(int[] part, int[] whole)
-        {
-            for (int i = 0; i < 26; i++)
+            word = -1;
+            index = -1;
+            int bestRemaining = int.MaxValue;
+            for (int w = 0; w < _words.Length; w++)
             {
-                if (part[i] > whole[i]) return false;
+                int remaining = _words[w].Length - _assigned[w];
+                if (remaining <= 0 || remaining >= bestRemaining) continue;
+                for (int i = 0; i < _words[w].Length; i++)
+                {
+                    if (_slotTaken[w][i] || _words[w][i] != ch) continue;
+                    word = w;
+                    index = i;
+                    bestRemaining = remaining;
+                    break;
+                }
             }
-            return true;
+            return word >= 0;
         }
 
-        private bool WordAllowed(int w)
+        /// <summary>Từ nên gợi ý: từ đầu tiên trong tutorial, sau đó là từ gần xong nhất.</summary>
+        private int FocusWord()
         {
-            if (_cards[w].Found) return false;
-            if (_phase == Phase.Tutorial && w != 0) return false;
-            return true;
+            if (_phase == Phase.Tutorial && _assigned[0] < _words[0].Length) return 0;
+            int best = -1;
+            int bestRemaining = int.MaxValue;
+            for (int w = 0; w < _words.Length; w++)
+            {
+                int remaining = _words[w].Length - _assigned[w];
+                if (remaining > 0 && remaining < bestRemaining)
+                {
+                    best = w;
+                    bestRemaining = remaining;
+                }
+            }
+            return best;
         }
 
+        /// <summary>Các chữ còn thiếu của một từ (theo thứ tự trong từ).</summary>
+        private string MissingLetters(int w)
+        {
+            string s = "";
+            if (w < 0) return s;
+            for (int i = 0; i < _words[w].Length; i++)
+            {
+                if (!_slotTaken[w][i]) s += _words[w][i];
+            }
+            return s;
+        }
+
+        /// <summary>Tất cả chữ còn thiếu của mọi từ.</summary>
+        private string AllMissingLetters()
+        {
+            string s = "";
+            for (int w = 0; w < _words.Length; w++) s += MissingLetters(w);
+            return s;
+        }
+
+        // ================================================================ flow
         private IEnumerator Flow()
         {
             yield return StartCoroutine(Intro());
-            yield return StartCoroutine(Tutorial());
 
-            int target = WordsToShowCta();
-            if (target > 1)
+            _phase = Phase.Tutorial;
+            _timeLeft = timeLimit;
+            ShowMessage("Tap letters to fill the words!");
+            RefreshTutorialHand();
+
+            while (_phase != Phase.End) yield return null;
+            HideHand();
+            HideMessage();
+            while (_flyingLetters > 0) yield return null;
+            if (!_lost)
             {
-                _phase = Phase.Free;
-                _idleTime = 0f;
-                int remaining = target - 1;
-                ShowMessage("Great! Find " + remaining + (remaining == 1 ? " more word" : " more words"));
+                while (_foundCount < _target) yield return null;
             }
 
-            while (_foundCount < target) yield return null;
-            _phase = Phase.End;
-            HideHand();
-            while (_flyingLetters > 0) yield return null;
-
-            yield return new WaitForSeconds(0.6f);
-            yield return StartCoroutine(EndCard());
+            yield return new WaitForSeconds(0.5f);
+            yield return StartCoroutine(EndPopup(!_lost));
         }
 
-        // ================================================================ intro
         private IEnumerator Intro()
         {
             _phase = Phase.Intro;
             _messageGroup.alpha = 0f;
 
-            int count = GridSize * GridSize;
-            Vector2[] from = new Vector2[count];
-            float[] delay = new float[count];
-            Vector2[] to = new Vector2[count];
-
-            // Mảnh gỗ rơi từ trên xuống lần lượt từng mảnh theo kiểu "rắn":
-            // hàng dưới cùng x tăng dần (trái -> phải), hết hàng thì lên hàng trên và đi x giảm dần
-            // (phải -> trái), cứ xen kẽ như vậy tới hàng trên cùng.
-            const float fallTime = 0.35f;
-            const float fallHeight = 1400f;
-            int maxOrder = GridSize * GridSize - 1;
-            float step = Mathf.Max(0.01f, (introDuration - fallTime - 0.05f) / maxOrder);
-
-            for (int r = 0; r < GridSize; r++)
+            // Ô gỗ rơi lần lượt kiểu "rắn": hàng dưới trái -> phải, hàng trên phải -> trái...
+            const float fallTime = 0.4f;
+            int maxOrder = Rows * Cols - 1;
+            float step = Mathf.Max(0.01f, (introDuration - fallTime) / maxOrder);
+            for (int r = 0; r < Rows; r++)
             {
-                for (int c = 0; c < GridSize; c++)
+                for (int c = 0; c < Cols; c++)
                 {
-                    int i = r * GridSize + c;
                     LetterTile tile = _tiles[r, c];
-                    int rowFromBottom = GridSize - 1 - r;
-                    to[i] = tile.Rect.anchoredPosition;
-                    from[i] = to[i] + new Vector2(0f, fallHeight);
-                    int xOrder = rowFromBottom % 2 == 0 ? c : GridSize - 1 - c;
-                    delay[i] = (rowFromBottom * GridSize + xOrder) * step;
-                    tile.Rect.anchoredPosition = from[i];
-                    tile.Rect.localRotation = Quaternion.identity;
-                    tile.Rect.localScale = Vector3.one;
+                    int rowFromBottom = Rows - 1 - r;
+                    int xOrder = rowFromBottom % 2 == 0 ? c : Cols - 1 - c;
+                    Vector2 to = CellPosition(r, c);
+                    tile.FallTo(to + new Vector2(0f, 1500f), to, (rowFromBottom * Cols + xOrder) * step, fallTime);
                 }
             }
 
+            _trayLayer.localScale = Vector3.zero;
+            _starBar.localScale = Vector3.zero;
             Vector2 headerHome = _header.anchoredPosition;
-            _header.anchoredPosition = headerHome + new Vector2(0f, 600f);
-
-            bool[] landed = new bool[count];
-            int landedCount = 0;
-            bool headerSoundPlayed = false;
+            Vector2 headerFrom = headerHome + new Vector2(0f, 700f);
+            _header.anchoredPosition = headerFrom;
 
             float time = 0f;
-            bool done = false;
-            while (!done)
+            bool headerSound = false;
+            bool trayShown = false;
+            float end = introDuration + 0.35f;
+            while (time < end)
             {
                 time += Time.deltaTime;
-                done = true;
-                bool landSoundThisFrame = false;
-                for (int i = 0; i < count; i++)
+                float startH = introDuration * 0.3f;
+                if (!headerSound && time >= startH)
                 {
-                    LetterTile tile = _tiles[i / GridSize, i % GridSize];
-                    float t = Mathf.Clamp01((time - delay[i]) / fallTime);
-                    if (t < 1f) done = false;
-                    tile.Rect.anchoredPosition = Vector2.LerpUnclamped(from[i], to[i], PATween.OutBounce(t));
-
-                    // Tiếng gỗ khi chạm chỗ (OutBounce chạm đích ở t = 0.7): cứ 3 mảnh phát 1 lần, tối đa 1 lần/frame.
-                    if (!landed[i] && t >= 0.7f)
-                    {
-                        landed[i] = true;
-                        landedCount++;
-                        if (!landSoundThisFrame && landedCount % 3 == 1)
-                        {
-                            landSoundThisFrame = true;
-                            Play(sfxWoodLand, 0.45f, Random.Range(0.9f, 1.15f));
-                        }
-                    }
-                }
-
-                if (!headerSoundPlayed && time >= introDuration * 0.35f)
-                {
-                    headerSoundPlayed = true;
+                    headerSound = true;
                     Play(sfxHeaderDrop, 0.8f, 1f);
                 }
+                float h = Mathf.Clamp01((time - startH) / 0.5f);
+                _header.anchoredPosition = Vector2.LerpUnclamped(headerFrom, headerHome, PATween.OutBack(h));
 
-                float h = Mathf.Clamp01((time - introDuration * 0.35f) / 0.5f);
-                if (h < 1f) done = false;
-                _header.anchoredPosition = Vector2.LerpUnclamped(headerHome + new Vector2(0f, 600f), headerHome, PATween.OutBack(h));
+                if (!trayShown && time >= introDuration * 0.6f)
+                {
+                    trayShown = true;
+                    StartCoroutine(PATween.Scale(_trayLayer, Vector3.zero, Vector3.one, 0.35f, PATween.OutBack));
+                    StartCoroutine(PATween.Scale(_starBar, Vector3.zero, Vector3.one, 0.35f, PATween.OutBack));
+                }
                 yield return null;
             }
-
-            for (int i = 0; i < count; i++)
-            {
-                LetterTile tile = _tiles[i / GridSize, i % GridSize];
-                tile.Rect.anchoredPosition = to[i];
-                tile.Rect.localRotation = Quaternion.identity;
-                tile.Rect.localScale = Vector3.one;
-            }
             _header.anchoredPosition = headerHome;
-        }
-
-        // ================================================================ tutorial
-        private IEnumerator Tutorial()
-        {
-            _phase = Phase.Tutorial;
-            LetterTile[] focus = _wordTiles[0];
-            for (int i = 0; i < focus.Length; i++)
-            {
-                focus[i].Rect.SetParent(_focusLayer, true);
-            }
-
-            _overlay.gameObject.SetActive(true);
-            _overlay.blocksRaycasts = true;
-            ShowMessage("Tap the letters to find " + _words[0] + "!");
-            yield return StartCoroutine(PATween.Fade(_overlay, 0f, 1f, 0.3f));
-            RefreshTutorialHand();
-
-            while (!_cards[0].Found) yield return null;
         }
 
         // ================================================================ input
@@ -398,62 +468,70 @@ namespace PA.TileWord
         {
             if (_phase != Phase.Tutorial && _phase != Phase.Free) return;
             if (tile.Used) return;
-            if (_refilling > 0) return;
 
             _idleTime = 0f;
             HideHand();
 
-            int index = _selection.IndexOf(tile);
-            if (index >= 0)
-            {
-                // Chạm lại một chữ đã chọn để bỏ chọn (thứ tự không quan trọng nên bỏ chữ nào cũng được).
-                _selection.RemoveAt(index);
-                tile.SetSelected(false);
-                Play(sfxTap, 0.9f, 0.85f);
-                RefreshTutorialHand();
-                return;
-            }
+            tile.StopMove();
+            tile.Used = true;
+            if (_tiles[tile.Row, tile.Col] == tile) _tiles[tile.Row, tile.Col] = null;
+            tile.Rect.SetParent(_fxLayer, true);
+            tile.Rect.SetAsLastSibling();
 
-            // Không cần đúng thứ tự: hợp lệ khi các chữ đã chọn (tính cả số lần lặp) nằm trọn trong một từ chưa tìm.
-            string candidate = SelectionString() + tile.Letter;
-            int[] candidateCounts = LetterCounts(candidate);
-            int completed = -1;
-            bool isValid = false;
-            for (int w = 0; w < _words.Length; w++)
+            int w;
+            int i;
+            if (FindSlot(tile.Letter, out w, out i)) OnCorrect(tile, w, i);
+            else OnWrong(tile);
+
+            RefillBoard();
+            RefreshTutorialHand();
+        }
+
+        private void OnCorrect(LetterTile tile, int w, int i)
+        {
+            _slotTaken[w][i] = true;
+            _assigned[w]++;
+            Play(sfxTap, 1f, 1f + 0.08f * (_assigned[w] - 1));
+            SetLabelColor(_lineLabels[w][i], IncomingColor);
+
+            if (_assigned[w] >= _words[w].Length)
             {
-                if (!WordAllowed(w)) continue;
-                if (!IsSubset(candidateCounts, _wordCounts[w])) continue;
-                isValid = true;
-                if (_words[w].Length == candidate.Length)
+                _completedWords++;
+                if (_completedWords >= _target)
                 {
-                    completed = w;
-                    break;
+                    _phase = Phase.End;
+                }
+                else if (_phase == Phase.Tutorial)
+                {
+                    _phase = Phase.Free;
+                    int remaining = _target - _completedWords;
+                    ShowMessage("Great! " + remaining + (remaining == 1 ? " more word!" : " more words!"));
                 }
             }
 
-            if (!isValid)
-            {
-                tile.Shake();
-                Play(sfxWrong);
-                RefreshTutorialHand();
-                return;
-            }
+            _flyingLetters++;
+            StartCoroutine(FlyToWord(tile, w, i));
+        }
 
-            _selection.Add(tile);
-            tile.SetSelected(true);
-            // Pitch tăng dần theo số chữ đã chọn: nghe "lên nốt" khi gần ghép xong từ.
-            Play(sfxTap, 1f, 1f + 0.1f * (_selection.Count - 1));
+        private void OnWrong(LetterTile tile)
+        {
+            int slot = _trayCount;
+            _trayCount++;
+            Play(sfxWrong, 1f, 1f);
+            StartCoroutine(FlashRed(++_flashVersion));
+            StartCoroutine(CrossRoutine(tile.Rect.anchoredPosition));
 
-            if (completed >= 0)
-            {
-                List<LetterTile> word = new List<LetterTile>(_selection);
-                _selection.Clear();
-                StartCoroutine(CompleteWord(completed, word));
-            }
-            else
-            {
-                RefreshTutorialHand();
-            }
+            if (_trayCount >= TraySize) Lose();
+
+            _flyingLetters++;
+            StartCoroutine(FallToTray(tile, slot));
+        }
+
+        private void Lose()
+        {
+            if (_phase == Phase.End) return;
+            _lost = true;
+            _phase = Phase.End;
         }
 
         private void RefreshTutorialHand()
@@ -463,93 +541,216 @@ namespace PA.TileWord
             if (next != null) ShowHand(next.Rect);
         }
 
-        /// <summary>
-        /// Ô chữ tiếp theo nên chỉ: chọn từ chưa tìm khớp với các chữ đang chọn (hoặc từ đầu tiên chưa tìm),
-        /// rồi lấy chữ còn thiếu đầu tiên theo thứ tự trong từ.
-        /// </summary>
+        /// <summary>Ô gợi ý: chữ còn thiếu đầu tiên của từ đang tập trung mà có trên board, ưu tiên ô gần giữa board.</summary>
         private LetterTile NextHintTile()
         {
-            int[] selected = LetterCounts(SelectionString());
-            for (int w = 0; w < _words.Length; w++)
+            if (_phase == Phase.End) return null;
+            string missing = MissingLetters(FocusWord());
+            for (int k = 0; k < missing.Length; k++)
             {
-                if (!WordAllowed(w)) continue;
-                if (!IsSubset(selected, _wordCounts[w])) continue;
+                LetterTile t = ClosestTile(missing[k]);
+                if (t != null) return t;
+            }
+            string all = AllMissingLetters();
+            for (int k = 0; k < all.Length; k++)
+            {
+                LetterTile t = ClosestTile(all[k]);
+                if (t != null) return t;
+            }
+            return null;
+        }
 
-                int[] needed = new int[26];
-                for (int k = 0; k < 26; k++) needed[k] = _wordCounts[w][k] - selected[k];
+        private LetterTile ClosestTile(char need)
+        {
+            LetterTile best = null;
+            float bestDist = float.MaxValue;
+            for (int r = 0; r < Rows; r++)
+            {
+                for (int c = 0; c < Cols; c++)
+                {
+                    LetterTile t = _tiles[r, c];
+                    if (t == null || t.Used || t.Letter != need) continue;
+                    float d = Mathf.Abs(r - (Rows - 1) * 0.5f) + Mathf.Abs(c - (Cols - 1) * 0.5f);
+                    if (d < bestDist)
+                    {
+                        bestDist = d;
+                        best = t;
+                    }
+                }
+            }
+            return best;
+        }
 
+        // ================================================================ board
+        private void BuildBoard()
+        {
+            _board = NewRect("Board", _root);
+            _board.sizeDelta = new Vector2(CellW * Cols, CellH * Rows);
+            _board.localScale = new Vector3(_boardScale, _boardScale, 1f);
+            _board.anchoredPosition = new Vector2(0f, _boardTop - CellH * Rows * _boardScale * 0.5f);
+
+            // Board cố định (seed cố định): chữ nhiễu ở mọi ô, rồi đặt đủ chữ của 2 từ đầu vào các ô khác nhau.
+            PARandom rng = new PARandom(BoardSeed);
+            char[,] letters = new char[Rows, Cols];
+            bool[,] reserved = new bool[Rows, Cols];
+            for (int r = 0; r < Rows; r++)
+            {
+                for (int c = 0; c < Cols; c++) letters[r, c] = _decoys[rng.Range(0, _decoys.Length)];
+            }
+            int seeded = Mathf.Min(2, _target);
+            for (int w = 0; w < seeded; w++)
+            {
                 string word = _words[w];
                 for (int i = 0; i < word.Length; i++)
                 {
-                    int li = word[i] - 'A';
-                    if (needed[li] <= 0) continue;
-                    LetterTile placed = _wordTiles[w][i];
-                    if (placed != null && !placed.Used && !placed.Selected && placed.Letter == word[i]) return placed;
-                    LetterTile any = FindTile(word[i], null, false);
-                    if (any != null) return any;
+                    for (int attempt = 0; attempt < 300; attempt++)
+                    {
+                        int r = rng.Range(0, Rows);
+                        int c = rng.Range(0, Cols);
+                        if (reserved[r, c]) continue;
+                        // Từ tutorial tránh viền ngoài để bàn tay chỉ dễ nhìn.
+                        if (w == 0 && attempt < 200 && (r == 0 || c == 0 || r == Rows - 1 || c == Cols - 1)) continue;
+                        reserved[r, c] = true;
+                        letters[r, c] = word[i];
+                        break;
+                    }
                 }
             }
-            return null;
-        }
 
-        /// <summary>Tìm ô trên board có chữ <paramref name="letter"/>, chưa dùng, không nằm trong <paramref name="exclude"/>.</summary>
-        private LetterTile FindTile(char letter, List<LetterTile> exclude, bool allowSelected)
-        {
-            for (int r = 0; r < GridSize; r++)
+            _tiles = new LetterTile[Rows, Cols];
+            for (int r = 0; r < Rows; r++)
             {
-                for (int c = 0; c < GridSize; c++)
+                for (int c = 0; c < Cols; c++)
                 {
-                    LetterTile t = _tiles[r, c];
-                    if (t == null || t.Used || t.Letter != letter) continue;
-                    if (!allowSelected && t.Selected) continue;
-                    if (exclude != null && exclude.Contains(t)) continue;
-                    return t;
+                    _tiles[r, c] = CreateTile(letters[r, c], r, c, CellPosition(r, c));
                 }
             }
-            return null;
         }
 
-        private string SelectionString()
+        private static Vector2 CellPosition(int row, int col)
         {
-            string s = "";
-            for (int i = 0; i < _selection.Count; i++) s += _selection[i].Letter;
-            return s;
+            return new Vector2((col - (Cols - 1) * 0.5f) * CellW, ((Rows - 1) * 0.5f - row) * CellH);
+        }
+
+        private LetterTile CreateTile(char letter, int row, int col, Vector2 pos)
+        {
+            Image bg = NewImage("Tile_" + row + "_" + col, _board, tileSprite, new Vector2(TileW, TileH), pos);
+            bg.raycastTarget = true;
+            TextMeshProUGUI label = NewText("Letter", bg.transform, letter.ToString(), TileFont, LetterTile.LetterColor, new Vector2(TileW, TileH), new Vector2(0f, 7f));
+
+            LetterTile tile = bg.gameObject.AddComponent<LetterTile>();
+            tile.Letter = letter;
+            tile.Row = row;
+            tile.Col = col;
+            tile.Rect = bg.rectTransform;
+            tile.Background = bg;
+            tile.Label = label;
+            tile.Tapped = OnTileTapped;
+            tile.Landed = OnTileLanded;
+            return tile;
+        }
+
+        private void OnTileLanded(LetterTile tile)
+        {
+            // Tối đa 1 tiếng gỗ mỗi 0.07s để không bị dồn tiếng khi cả cột rơi.
+            if (Time.time - _lastLandSfx < 0.07f) return;
+            _lastLandSfx = Time.time;
+            Play(sfxWoodLand, 0.4f, Random.Range(0.92f, 1.15f));
         }
 
         /// <summary>
-        /// Sau khi một từ được clear, đảm bảo mọi từ chưa tìm vẫn còn đủ ô trên board (ô của chúng có thể đã bị
-        /// người chơi dùng cho từ khác có chung chữ). Thiếu thì lấy ô cùng chữ khác, không có thì đổi một ô chữ nhiễu.
+        /// Ô phía trên rơi xuống lấp chỗ trống, ô mới hiện ra ở các ô trên cùng.
+        /// Mỗi ô tự quản lý chuyển động nên người chơi vẫn chạm được trong lúc board đang rơi.
         /// </summary>
-        private void EnsureSolvable()
+        private void RefillBoard()
         {
-            List<LetterTile> claimed = new List<LetterTile>();
-            for (int w = 0; w < _words.Length; w++)
+            List<LetterTile> spawned = new List<LetterTile>();
+            for (int c = 0; c < Cols; c++)
             {
-                if (_cards[w].Found) continue;
-                string word = _words[w];
-                for (int i = 0; i < word.Length; i++)
+                int write = Rows - 1;
+                for (int r = Rows - 1; r >= 0; r--)
                 {
-                    LetterTile t = _wordTiles[w][i];
-                    bool ok = t != null && !t.Used && t.Letter == word[i] && !claimed.Contains(t);
-                    if (!ok) t = FindTile(word[i], claimed, true);
-                    if (t == null) t = ConvertFillerTile(word[i], claimed);
-                    if (t != null) claimed.Add(t);
-                    _wordTiles[w][i] = t;
+                    LetterTile tile = _tiles[r, c];
+                    if (tile == null) continue;
+                    if (r != write)
+                    {
+                        _tiles[write, c] = tile;
+                        _tiles[r, c] = null;
+                        tile.Row = write;
+                        tile.FallTo(tile.Rect.anchoredPosition, CellPosition(write, c), 0f, 0.3f);
+                    }
+                    write--;
                 }
+
+                for (int r = write; r >= 0; r--)
+                {
+                    LetterTile tile = CreateTile(NextFillLetter(), r, c, CellPosition(r, c));
+                    tile.PopIn(0.12f + (write - r) * 0.05f);
+                    _tiles[r, c] = tile;
+                    spawned.Add(tile);
+                }
+            }
+            EnsureUpcomingLetters(spawned);
+        }
+
+        private char NextFillLetter()
+        {
+            string missing = AllMissingLetters();
+            if (missing.Length > 0 && Random.value < 0.3f) return missing[Random.Range(0, missing.Length)];
+            return _decoys[Random.Range(0, _decoys.Length)];
+        }
+
+        /// <summary>
+        /// Luôn có ô cho 2 chữ còn thiếu của từ đang tập trung. Thiếu thì đổi chữ của một ô
+        /// (ưu tiên ô vừa xuất hiện, chưa kịp nhìn thấy; không đổi ô đang có chữ hữu ích).
+        /// </summary>
+        private void EnsureUpcomingLetters(List<LetterTile> preferred)
+        {
+            if (_phase == Phase.End) return;
+            string upcoming = MissingLetters(FocusWord());
+            if (upcoming.Length > 2) upcoming = upcoming.Substring(0, 2);
+            string keep = AllMissingLetters();
+            List<LetterTile> claimed = new List<LetterTile>();
+            for (int k = 0; k < upcoming.Length; k++)
+            {
+                char ch = upcoming[k];
+                LetterTile found = null;
+                for (int r = 0; r < Rows && found == null; r++)
+                {
+                    for (int c = 0; c < Cols; c++)
+                    {
+                        LetterTile t = _tiles[r, c];
+                        if (t != null && t.Letter == ch && !claimed.Contains(t))
+                        {
+                            found = t;
+                            break;
+                        }
+                    }
+                }
+                if (found == null) found = ConvertTile(ch, keep, claimed, preferred);
+                if (found != null) claimed.Add(found);
             }
         }
 
-        private LetterTile ConvertFillerTile(char letter, List<LetterTile> claimed)
+        private LetterTile ConvertTile(char letter, string keep, List<LetterTile> claimed, List<LetterTile> preferred)
         {
             List<LetterTile> candidates = new List<LetterTile>();
-            for (int r = 0; r < GridSize; r++)
+            for (int i = 0; i < preferred.Count; i++)
             {
-                for (int c = 0; c < GridSize; c++)
+                LetterTile t = preferred[i];
+                if (t != null && !t.Used && !claimed.Contains(t) && keep.IndexOf(t.Letter) < 0) candidates.Add(t);
+            }
+            if (candidates.Count == 0)
+            {
+                for (int r = 0; r < Rows; r++)
                 {
-                    LetterTile t = _tiles[r, c];
-                    if (t == null || t.Used || t.Selected || claimed.Contains(t)) continue;
-                    if (_filler.IndexOf(t.Letter) < 0) continue;
-                    candidates.Add(t);
+                    for (int c = 0; c < Cols; c++)
+                    {
+                        LetterTile t = _tiles[r, c];
+                        if (t == null || claimed.Contains(t) || keep.IndexOf(t.Letter) >= 0) continue;
+                        if (_handTarget != null && t.Rect == _handTarget) continue;
+                        candidates.Add(t);
+                    }
                 }
             }
             if (candidates.Count == 0) return null;
@@ -559,200 +760,21 @@ namespace PA.TileWord
             return pick;
         }
 
-        // ================================================================ word complete
-        private IEnumerator CompleteWord(int wordIndex, List<LetterTile> letters)
+        // ================================================================ correct letter -> word line
+        private IEnumerator FlyToWord(LetterTile tile, int w, int i)
         {
-            WordCard card = _cards[wordIndex];
-            card.Found = true;
-            _flyingLetters += letters.Count;
-            bool wasTutorial = _phase == Phase.Tutorial;
-            Play(sfxStreak, 0.8f, 1f);
-            BringCardToFront(wordIndex);
-
-            for (int i = 0; i < letters.Count; i++)
-            {
-                LetterTile used = letters[i];
-                used.Used = true;
-                used.Rect.SetParent(_fxLayer, true);
-                if (_tiles[used.Row, used.Col] == used) _tiles[used.Row, used.Col] = null;
-            }
-
-            // 1) Vệt sáng nối các chữ.
-            List<Image> beams = new List<Image>();
-            for (int i = 0; i < letters.Count; i++)
-            {
-                SpawnSparkle(letters[i].Rect.anchoredPosition, 110f, 0.45f);
-                if (i == letters.Count - 1) break;
-                Vector2 a = letters[i].Rect.anchoredPosition;
-                Vector2 b = letters[i + 1].Rect.anchoredPosition;
-                Image beam = CreateBeam(a, b);
-                beams.Add(beam);
-                yield return StartCoroutine(GrowBeam(beam, (b - a).magnitude, 0.09f));
-            }
-            for (int i = 0; i < letters.Count; i++) letters[i].Rect.SetAsLastSibling();
-
-            if (wasTutorial)
-            {
-                StartCoroutine(HideOverlay());
-            }
-            yield return new WaitForSeconds(0.12f);
-            StartCoroutine(FadeAndDestroyBeams(beams, 0.25f));
-
-            // 2) Chữ bay về card: mỗi chữ vào ô có cùng chữ cái (người chơi có thể chọn theo thứ tự bất kỳ).
-            string word = _words[wordIndex];
-            bool[] slotTaken = new bool[word.Length];
-            for (int i = 0; i < letters.Count; i++)
-            {
-                int slot = -1;
-                for (int s = 0; s < word.Length; s++)
-                {
-                    if (!slotTaken[s] && word[s] == letters[i].Letter)
-                    {
-                        slot = s;
-                        break;
-                    }
-                }
-                if (slot < 0) slot = i;
-                slotTaken[slot] = true;
-                StartCoroutine(FlyLetter(letters[i], card, slot, i * 0.08f));
-            }
-
-            // 3) Fill board: ô phía trên rơi xuống lấp chỗ trống, chữ mới rơi từ trên vào.
-            //    RefillBoard cập nhật lưới ngay trong lần chạy đầu (trước yield), nên EnsureSolvable thấy lưới mới.
-            if (refillBoard) StartCoroutine(RefillBoard());
-            EnsureSolvable();
-
-            while (CountFilled(card) < letters.Count) yield return null;
-
-            Play(sfxWord);
-            Vector2 cardPos = (Vector2)_fxLayer.InverseTransformPoint(card.Rect.position);
-            for (int k = 0; k < 8; k++)
-            {
-                Vector2 offset = Random.insideUnitCircle * new Vector2(card.Rect.rect.width * 0.6f, 50f);
-                SpawnSparkle(cardPos + offset, Random.Range(50f, 90f), Random.Range(0.4f, 0.7f));
-            }
-            yield return StartCoroutine(PATween.Punch(card.Rect, 0.2f, 0.3f));
-            StartCoroutine(RemoveCard(wordIndex));
-
-            _foundCount++;
-            _idleTime = 0f;
-        }
-
-        private IEnumerator RefillBoard()
-        {
-            _refilling++;
-
-            List<LetterTile> moving = new List<LetterTile>();
-            List<Vector2> fromPos = new List<Vector2>();
-            List<Vector2> toPos = new List<Vector2>();
-            List<float> delays = new List<float>();
-
-            for (int c = 0; c < GridSize; c++)
-            {
-                float columnDelay = c * 0.025f;
-
-                // Dồn các ô còn lại xuống đáy cột.
-                int write = GridSize - 1;
-                for (int r = GridSize - 1; r >= 0; r--)
-                {
-                    LetterTile tile = _tiles[r, c];
-                    if (tile == null) continue;
-                    if (r != write)
-                    {
-                        _tiles[write, c] = tile;
-                        _tiles[r, c] = null;
-                        tile.Row = write;
-                        moving.Add(tile);
-                        fromPos.Add(tile.Rect.anchoredPosition);
-                        toPos.Add(CellPosition(write, c));
-                        delays.Add(columnDelay);
-                    }
-                    write--;
-                }
-
-                // Chữ mới rơi từ phía trên board vào các ô trống trên cùng.
-                int empty = write + 1;
-                for (int r = write; r >= 0; r--)
-                {
-                    Vector2 target = CellPosition(r, c);
-                    Vector2 start = target + new Vector2(0f, empty * CellH + 120f);
-                    char letter = _filler[Random.Range(0, _filler.Length)];
-                    LetterTile tile = CreateTile(letter, r, c, start);
-                    _tiles[r, c] = tile;
-                    moving.Add(tile);
-                    fromPos.Add(start);
-                    toPos.Add(target);
-                    delays.Add(columnDelay + 0.06f + (write - r) * 0.04f);
-                }
-            }
-
-            const float fallTime = 0.35f;
-            float maxDelay = 0f;
-            for (int i = 0; i < delays.Count; i++) maxDelay = Mathf.Max(maxDelay, delays[i]);
-
-            // Tiếng gỗ chạm chỗ: mỗi cột phát 1 lần (khi ô đầu tiên của cột chạm đích), tối đa 1 lần/frame.
-            bool[] columnSounded = new bool[GridSize];
-
-            float time = 0f;
-            while (time < maxDelay + fallTime)
-            {
-                time += Time.deltaTime;
-                bool soundThisFrame = false;
-                for (int i = 0; i < moving.Count; i++)
-                {
-                    if (moving[i] == null) continue;
-                    float t = Mathf.Clamp01((time - delays[i]) / fallTime);
-                    moving[i].Rect.anchoredPosition = Vector2.LerpUnclamped(fromPos[i], toPos[i], PATween.OutBounce(t));
-
-                    int col = moving[i].Col;
-                    if (t >= 0.7f && !columnSounded[col] && !soundThisFrame)
-                    {
-                        columnSounded[col] = true;
-                        soundThisFrame = true;
-                        Play(sfxWoodLand, 0.4f, Random.Range(0.95f, 1.15f));
-                    }
-                }
-                yield return null;
-            }
-            for (int i = 0; i < moving.Count; i++)
-            {
-                if (moving[i] != null) moving[i].Rect.anchoredPosition = toPos[i];
-            }
-
-            _refilling--;
-        }
-
-        private IEnumerator HideOverlay()
-        {
-            yield return StartCoroutine(PATween.Fade(_overlay, _overlay.alpha, 0f, 0.3f));
-            _overlay.blocksRaycasts = false;
-            _overlay.gameObject.SetActive(false);
-        }
-
-        private int CountFilled(WordCard card)
-        {
-            int n = 0;
-            for (int i = 0; i < card.Labels.Length; i++)
-            {
-                if (card.Labels[i].alpha > 0.99f) n++;
-            }
-            return n;
-        }
-
-        private IEnumerator FlyLetter(LetterTile tile, WordCard card, int slotIndex, float delay)
-        {
-            if (delay > 0f) yield return new WaitForSeconds(delay);
-
-            RectTransform slot = (RectTransform)card.Slots[slotIndex].transform;
+            TextMeshProUGUI label = _lineLabels[w][i];
             Vector2 p0 = tile.Rect.anchoredPosition;
-            Vector2 p2 = _fxLayer.InverseTransformPoint(slot.position);
-            Vector2 p1 = (p0 + p2) * 0.5f + new Vector2(Random.Range(-160f, 160f), 260f);
+            Vector2 p2 = _fxLayer.InverseTransformPoint(label.rectTransform.position);
+            Vector2 p1 = (p0 + p2) * 0.5f + new Vector2(p0.x < p2.x ? -170f : 170f, 120f);
             float startScale = tile.Rect.localScale.x;
-            float endScale = _slotSize / TileH;
+            float endScale = LineFont * _lineScale / TileFont;
+            Color bgColor = tile.Background.color;
 
-            const float duration = 0.55f;
+            SpawnSparkle(p0, 130f, 0.4f);
+            const float duration = 0.6f;
             float time = 0f;
-            float trailTimer = 0f;
+            Vector2 prev = p0;
             while (time < duration)
             {
                 time += Time.deltaTime;
@@ -762,60 +784,205 @@ namespace PA.TileWord
                 tile.Rect.anchoredPosition = pos;
                 float s = Mathf.Lerp(startScale, endScale, t);
                 tile.Rect.localScale = new Vector3(s, s, 1f);
+                Color c = bgColor;
+                c.a = 1f - Mathf.Clamp01((t - 0.45f) / 0.4f);
+                tile.Background.color = c;
 
-                trailTimer += Time.deltaTime;
-                if (trailTimer >= 0.02f)
-                {
-                    trailTimer = 0f;
-                    SpawnSparkle(pos, Random.Range(45f, 70f), 0.35f);
-                }
+                // Vệt sáng liền mạch dọc theo đường bay + lấp lánh.
+                SpawnTrail(prev, pos, Mathf.Lerp(46f, 26f, t), 0.35f);
+                if (Random.value < 0.5f) SpawnSparkle(pos + Random.insideUnitCircle * 20f, Random.Range(50f, 80f), 0.4f);
+                prev = pos;
                 yield return null;
             }
 
             Destroy(tile.gameObject);
-            card.Labels[slotIndex].alpha = 1f;
-            card.Slots[slotIndex].color = FoundSlotColor;
-            Play(sfxSlotFill, 0.7f, 1f + 0.08f * slotIndex);
-            SpawnSparkle(p2, 90f, 0.35f);
-            _flyingLetters--;
-            yield return StartCoroutine(PATween.Punch(slot, 0.3f, 0.2f));
+            SetLabelColor(label, Brown);
+            Play(sfxSlotFill, 0.7f, 1f + 0.08f * i);
+            SpawnSparkle(p2, 110f, 0.4f);
+            StartCoroutine(PATween.Punch(label.rectTransform, 0.45f, 0.25f));
+
+            _landed[w]++;
+            if (_landed[w] >= _words[w].Length) StartCoroutine(WordDone(w));
+            else _flyingLetters--;
         }
 
-        private Image CreateBeam(Vector2 from, Vector2 to)
+        /// <summary>Từ hoàn thành: đổi màu xanh, một ngôi sao bay lên thanh tiến trình và sáng lên.</summary>
+        private IEnumerator WordDone(int w)
         {
-            RectTransform rt = NewRect("Beam", _fxLayer);
+            Play(sfxWord);
+            TextMeshProUGUI[] labels = _lineLabels[w];
+            Vector2 center = Vector2.zero;
+            for (int i = 0; i < labels.Length; i++)
+            {
+                SetLabelColor(labels[i], WordDoneColor);
+                Vector2 p = _fxLayer.InverseTransformPoint(labels[i].rectTransform.position);
+                center += p;
+                SpawnSparkle(p + Random.insideUnitCircle * 25f, Random.Range(60f, 100f), Random.Range(0.4f, 0.7f));
+                StartCoroutine(PATween.Punch(labels[i].rectTransform, 0.3f, 0.3f));
+            }
+            center /= labels.Length;
+
+            // Sao sáng theo thứ tự hoàn thành từ.
+            int starIndex = Mathf.Min(_starsLit, _stars.Length - 1);
+            _starsLit++;
+            Image target = _stars[starIndex];
+            Vector2 p2 = _fxLayer.InverseTransformPoint(target.rectTransform.position);
+            Image flying = NewImage("FlyingStar", _fxLayer, starOnSprite, new Vector2(90f, 90f), center);
+            Vector2 p1 = (center + p2) * 0.5f + new Vector2(220f, 60f);
+
+            const float duration = 0.55f;
+            float time = 0f;
+            Vector2 prev = center;
+            while (time < duration)
+            {
+                time += Time.deltaTime;
+                float t = PATween.InOutSine(Mathf.Clamp01(time / duration));
+                float u = 1f - t;
+                Vector2 pos = u * u * center + 2f * u * t * p1 + t * t * p2;
+                flying.rectTransform.anchoredPosition = pos;
+                flying.rectTransform.localRotation = Quaternion.Euler(0f, 0f, t * 360f);
+                SpawnTrail(prev, pos, 34f, 0.3f);
+                prev = pos;
+                yield return null;
+            }
+            Destroy(flying.gameObject);
+
+            target.sprite = starOnSprite;
+            Play(sfxStreak, 0.8f, 1f + 0.1f * starIndex);
+            for (int k = 0; k < 6; k++) SpawnSparkle(p2 + Random.insideUnitCircle * 40f, Random.Range(50f, 90f), Random.Range(0.4f, 0.7f));
+            StartCoroutine(PATween.Punch(target.rectTransform, 0.5f, 0.35f));
+
+            _foundCount++;
+            _flyingLetters--;
+        }
+
+        // ================================================================ wrong letter -> tray
+        private IEnumerator FallToTray(LetterTile tile, int slotIndex)
+        {
+            Image slot = _traySlots[slotIndex];
+            tile.Background.color = LetterTile.WrongColor;
+
+            // Rung tại chỗ.
+            Vector2 basePos = tile.Rect.anchoredPosition;
+            float time = 0f;
+            const float shake = 0.28f;
+            while (time < shake)
+            {
+                time += Time.deltaTime;
+                float k = 1f - Mathf.Clamp01(time / shake);
+                tile.Rect.anchoredPosition = basePos + new Vector2(Mathf.Sin(time * 70f) * 14f * k, 0f);
+                yield return null;
+            }
+
+            // Bay vòng vào ô khay.
+            Vector2 p0 = basePos;
+            Vector2 p2 = _fxLayer.InverseTransformPoint(slot.rectTransform.position);
+            Vector2 p1 = new Vector2((p0.x + p2.x) * 0.5f, Mathf.Max(p0.y, p2.y) + 140f);
+            float startScale = tile.Rect.localScale.x;
+            float endScale = TraySlot * 0.94f / TileH;
+            const float duration = 0.45f;
+            time = 0f;
+            while (time < duration)
+            {
+                time += Time.deltaTime;
+                float t = PATween.InOutSine(Mathf.Clamp01(time / duration));
+                float u = 1f - t;
+                tile.Rect.anchoredPosition = u * u * p0 + 2f * u * t * p1 + t * t * p2;
+                float s = Mathf.Lerp(startScale, endScale, t);
+                tile.Rect.localScale = new Vector3(s, s, 1f);
+                tile.Background.color = Color.Lerp(LetterTile.WrongColor, LetterTile.NormalColor, t);
+                yield return null;
+            }
+
+            tile.Rect.SetParent(slot.transform, false);
+            tile.Rect.anchoredPosition = Vector2.zero;
+            tile.Rect.localScale = new Vector3(endScale, endScale, 1f);
+            tile.Background.color = LetterTile.NormalColor;
+            tile.Background.raycastTarget = false;
+            Play(sfxWoodLand, 0.8f, 1f);
+            StartCoroutine(PATween.Punch(slot.rectTransform, 0.15f, 0.2f));
+            _flyingLetters--;
+        }
+
+        private IEnumerator FlashRed(int version)
+        {
+            // Nháy đỏ 2 lần.
+            const float duration = 0.5f;
+            float time = 0f;
+            while (time < duration)
+            {
+                if (version != _flashVersion) yield break;
+                time += Time.deltaTime;
+                float t = Mathf.Clamp01(time / duration);
+                float k = Mathf.Abs(Mathf.Sin(t * Mathf.PI * 2f)) * (1f - t * 0.5f);
+                _flash.color = new Color(1f, 0.05f, 0.05f, k * 0.22f);
+                _flashEdges.color = new Color(1f, 0.08f, 0.05f, k);
+                yield return null;
+            }
+            if (version == _flashVersion)
+            {
+                _flash.color = new Color(1f, 0.05f, 0.05f, 0f);
+                _flashEdges.color = new Color(1f, 0.08f, 0.05f, 0f);
+            }
+        }
+
+        private IEnumerator CrossRoutine(Vector2 pos)
+        {
+            // cross.png gốc màu trắng: bản trắng to hơn làm viền, bản đỏ đè lên.
+            RectTransform rt = NewRect("WrongX", _fxLayer);
+            rt.anchoredPosition = pos;
+            CanvasGroup group = rt.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            NewImage("Rim", rt, crossSprite, new Vector2(172f, 172f), Vector2.zero);
+            Image red = NewImage("Red", rt, crossSprite, new Vector2(140f, 140f), Vector2.zero);
+            red.color = new Color32(226, 30, 36, 255);
+            float time = 0f;
+            const float total = 0.85f;
+            while (time < total)
+            {
+                time += Time.deltaTime;
+                float s = time < 0.2f ? PATween.OutBack(time / 0.2f) : 1f;
+                rt.localScale = new Vector3(s, s, 1f);
+                float a = time < 0.6f ? 1f : 1f - (time - 0.6f) / 0.25f;
+                group.alpha = Mathf.Clamp01(a);
+                yield return null;
+            }
+            Destroy(rt.gameObject);
+        }
+
+        // ================================================================ fx
+        private void SpawnTrail(Vector2 from, Vector2 to, float width, float life)
+        {
+            Vector2 d = to - from;
+            float len = d.magnitude;
+            if (len < 0.5f) return;
+            RectTransform rt = NewRect("Trail", _fxLayer);
+            rt.SetAsFirstSibling();
             rt.pivot = new Vector2(0f, 0.5f);
             rt.anchoredPosition = from;
-            Vector2 d = to - from;
             rt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
-            rt.sizeDelta = new Vector2(0f, 22f);
+            rt.sizeDelta = new Vector2(len + width * 0.5f, width);
             Image img = rt.gameObject.AddComponent<Image>();
-            img.color = StreakColor;
+            img.color = TrailColor;
             img.raycastTarget = false;
-            return img;
+            StartCoroutine(TrailRoutine(img, width, life));
         }
 
-        private IEnumerator GrowBeam(Image beam, float length, float duration)
+        private IEnumerator TrailRoutine(Image img, float width, float life)
         {
-            RectTransform rt = beam.rectTransform;
-            yield return StartCoroutine(PATween.Run(duration, PATween.OutCubic, delegate (float t)
+            RectTransform rt = img.rectTransform;
+            float time = 0f;
+            while (time < life)
             {
-                rt.sizeDelta = new Vector2(length * t, 22f);
-            }));
-        }
-
-        private IEnumerator FadeAndDestroyBeams(List<Image> beams, float duration)
-        {
-            yield return StartCoroutine(PATween.Run(duration, PATween.Linear, delegate (float t)
-            {
-                for (int i = 0; i < beams.Count; i++)
-                {
-                    Color c = StreakColor;
-                    c.a *= 1f - t;
-                    beams[i].color = c;
-                }
-            }));
-            for (int i = 0; i < beams.Count; i++) Destroy(beams[i].gameObject);
+                time += Time.deltaTime;
+                float t = Mathf.Clamp01(time / life);
+                Color c = TrailColor;
+                c.a *= 1f - t;
+                img.color = c;
+                rt.sizeDelta = new Vector2(rt.sizeDelta.x, width * (1f - t * 0.8f));
+                yield return null;
+            }
+            Destroy(img.gameObject);
         }
 
         private void SpawnSparkle(Vector2 pos, float size, float life)
@@ -823,23 +990,25 @@ namespace PA.TileWord
             Image img = NewImage("Sparkle", _fxLayer, sparkleSprite, new Vector2(size, size), pos);
             img.color = StreakColor;
             img.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 90f));
-            img.transform.SetAsFirstSibling();
             StartCoroutine(SparkleRoutine(img, life));
         }
 
         private IEnumerator SparkleRoutine(Image img, float life)
         {
             Color baseColor = img.color;
-            yield return StartCoroutine(PATween.Run(life, PATween.Linear, delegate (float t)
+            float time = 0f;
+            while (time < life)
             {
-                if (img == null) return;
+                time += Time.deltaTime;
+                float t = Mathf.Clamp01(time / life);
                 Color c = baseColor;
                 c.a = baseColor.a * (1f - t);
                 img.color = c;
                 float s = Mathf.Lerp(1f, 0.3f, t);
                 img.rectTransform.localScale = new Vector3(s, s, 1f);
-            }));
-            if (img != null) Destroy(img.gameObject);
+                yield return null;
+            }
+            Destroy(img.gameObject);
         }
 
         // ================================================================ hand
@@ -871,20 +1040,18 @@ namespace PA.TileWord
                 while (time < cycle && _handTarget != null)
                 {
                     time += Time.deltaTime;
-                    Vector2 targetPos = (Vector2)_rootTop.InverseTransformPoint(_handTarget.position) + new Vector2(8f, -22f);
+                    Vector2 targetPos = (Vector2)_rootTop.InverseTransformPoint(_handTarget.position) + new Vector2(10f, -26f);
                     Vector2 offset;
                     float scale;
                     if (time < 0.35f)
                     {
-                        float t = PATween.OutCubic(time / 0.35f);
-                        offset = Vector2.Lerp(away, Vector2.zero, t);
+                        offset = Vector2.Lerp(away, Vector2.zero, PATween.OutCubic(time / 0.35f));
                         scale = 1f;
                     }
                     else if (time < 0.6f)
                     {
-                        float t = (time - 0.35f) / 0.25f;
                         offset = Vector2.zero;
-                        scale = 1f - Mathf.Sin(t * Mathf.PI) * 0.15f;
+                        scale = 1f - Mathf.Sin((time - 0.35f) / 0.25f * Mathf.PI) * 0.15f;
                     }
                     else
                     {
@@ -897,22 +1064,26 @@ namespace PA.TileWord
                 }
             }
             _handLoop = null;
+            _hand.gameObject.SetActive(false);
         }
 
-        // ================================================================ end card
-        private IEnumerator EndCard()
+        // ================================================================ end popup
+        private IEnumerator EndPopup(bool win)
         {
-            Play(sfxWin);
+            if (win) Play(sfxWin);
             StartCoroutine(FadeMusic(musicVolume * 0.4f, 0.8f));
             StoreBridge.GameEnded();
 
-            RectTransform end = NewRect("EndCard", _canvasRect);
+            RectTransform end = NewRect("EndPopup", _canvasRect);
             Stretch(end);
+            // Popup win/lose đã có nút CTA riêng: ẩn thanh CTA ingame.
+            _bottomBar.gameObject.SetActive(false);
+            _ctaButton = null;
             CanvasGroup group = end.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 0f;
 
             Image dim = end.gameObject.AddComponent<Image>();
-            dim.color = new Color(0f, 0f, 0f, 0.78f);
+            dim.color = new Color(0f, 0f, 0f, 0.72f);
             dim.raycastTarget = true;
             Button anywhere = end.gameObject.AddComponent<Button>();
             anywhere.transition = Selectable.Transition.None;
@@ -921,40 +1092,54 @@ namespace PA.TileWord
             RectTransform content = NewRect("Content", end);
             content.sizeDelta = new Vector2(RefWidth, RefHeight);
 
-            Image logo = NewImage("Logo", content, logoSprite, new Vector2(860f, 860f * 719f / 1050f), new Vector2(0f, 260f));
-            logo.rectTransform.localScale = Vector3.zero;
-
-            // Nút cam kiểu PLAY của màn Home gốc (sprite PlayButton 537x237).
-            Vector2 buttonSize = new Vector2(640f, 640f * 237f / 537f);
-            Image button = NewImage("ContinueButton", content, buttonSprite, buttonSize, new Vector2(0f, -340f));
-            button.raycastTarget = true;
-            Button continueButton = button.gameObject.AddComponent<Button>();
-            continueButton.transition = Selectable.Transition.None;
-            continueButton.onClick.AddListener(OpenStore);
-
-            // Chữ trắng viền cam đậm: viền giả bằng 8 bản sao lệch quanh chữ chính (không cần material outline của TMP).
-            Color outline = new Color32(206, 84, 8, 255);
-            Vector2 labelSize = new Vector2(600f, 200f);
-            Vector2 labelPos = new Vector2(0f, 10f);
-            const float o = 5f;
-            Vector2[] offsets =
+            // Thân khung (phần kem viền cam) của cả 2 popup đều là 800x1170 px. Popup NICE có thêm chữ NICE nhô ra
+            // trái/trên nên ảnh to hơn (881x1242, thân ở x 81..880, y 72..1241): căn theo thân để khỏi lệch.
+            const float bodyW = 760f;
+            const float px = bodyW / 800f;
+            float bodyH = 1170f * px;
+            float bottom = -bodyH * 0.5f;
+            RectTransform body = NewRect("PopupBody", content);
+            body.sizeDelta = new Vector2(bodyW, bodyH);
+            body.anchoredPosition = new Vector2(0f, 70f);
+            Image button;
+            if (win)
             {
-                new Vector2(-o, 0f), new Vector2(o, 0f), new Vector2(0f, -o), new Vector2(0f, o),
-                new Vector2(-o, -o), new Vector2(o, -o), new Vector2(-o, o), new Vector2(o, o),
-            };
-            for (int i = 0; i < offsets.Length; i++)
-            {
-                NewText("LabelOutline", button.transform, "CONTINUE", 84f, outline, labelSize, labelPos + offsets[i]);
+                Vector2 imageSize = new Vector2(881f * px, 1242f * px);
+                Vector2 imageOffset = new Vector2((440.5f - 480.5f) * px, (656.5f - 621f) * px);
+                NewImage("NicePanel", body, winPanelSprite, imageSize, imageOffset);
+                // Nửa trên thân là chú chó (tới ~57% chiều cao); nội dung đặt bên dưới.
+                for (int k = 0; k < _target; k++)
+                {
+                    float x = (k - (_target - 1) * 0.5f) * 110f;
+                    NewImage("Star", body, starOnSprite, new Vector2(96f, 96f), new Vector2(x, bottom + 385f));
+                }
+                NewText("Question", body, "Do you want to play\na harder level?", 48f, Brown, new Vector2(660f, 130f), new Vector2(0f, bottom + 268f));
+                button = NewImage("HardButton", body, hardButtonSprite, new Vector2(390f, 390f * 237f / 537f), new Vector2(0f, bottom + 112f));
+                NewOutlinedText(button.transform, "PLAY HARD", 60f, Color.white, new Color32(140, 18, 8, 255), new Vector2(420f, 150f), new Vector2(0f, 8f), 4f);
             }
-            NewText("LabelShadow", button.transform, "CONTINUE", 84f, outline, labelSize, labelPos + new Vector2(0f, -o * 2f));
-            NewText("Label", button.transform, "CONTINUE", 84f, Color.white, labelSize, labelPos);
-            button.rectTransform.localScale = Vector3.zero;
+            else
+            {
+                NewImage("LosePanel", body, losePanelSprite, new Vector2(bodyW, bodyH), Vector2.zero);
+                float iconW = 560f;
+                float iconH = iconW * 532f / 504f;
+                NewImage("LoseIcon", body, loseIconSprite, new Vector2(iconW, iconH), new Vector2(0f, bodyH * 0.5f - 50f - iconH * 0.5f));
+                string reason = _timeUp ? "Time's up!" : "The tray is full!";
+                NewText("Reason", body, reason, 58f, new Color32(214, 40, 30, 255), new Vector2(660f, 80f), new Vector2(0f, bottom + 405f));
+                NewText("Question", body, "Do you want to try again?", 48f, Brown, new Vector2(680f, 80f), new Vector2(0f, bottom + 320f));
+                button = NewImage("TryAgainButton", body, buttonSprite, new Vector2(420f, 420f * 237f / 537f), new Vector2(0f, bottom + 160f));
+                NewOutlinedText(button.transform, "TRY AGAIN", 66f, Color.white, new Color32(206, 84, 8, 255), new Vector2(420f, 150f), new Vector2(0f, 8f), 4f);
+            }
+            button.raycastTarget = true;
+            Button btn = button.gameObject.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None;
+            btn.onClick.AddListener(OpenStore);
 
+            body.localScale = Vector3.zero;
+            button.rectTransform.localScale = Vector3.zero;
             yield return StartCoroutine(PATween.Fade(group, 0f, 1f, 0.3f));
-            yield return StartCoroutine(PATween.Scale(logo.rectTransform, Vector3.zero, Vector3.one, 0.45f, PATween.OutBack));
+            yield return StartCoroutine(PATween.Scale(body, Vector3.zero, Vector3.one, 0.45f, PATween.OutBack));
             yield return StartCoroutine(PATween.Scale(button.rectTransform, Vector3.zero, Vector3.one, 0.35f, PATween.OutBack));
 
-            // Nút Continue nhịp nhàng để mời bấm.
             float time = 0f;
             while (true)
             {
@@ -1001,327 +1186,303 @@ namespace PA.TileWord
             _root.sizeDelta = new Vector2(RefWidth, RefHeight);
         }
 
+        private static float HX(float px) { return (px - 540f) * HeaderScale; }
+        // Toạ độ trên ảnh header (px, gốc trên-trái) -> toạ độ trong khung header (pivot ở mép trên).
+        private static float HY(float py) { return -py * HeaderScale; }
+
         private void BuildHeader()
         {
-            float width = 1000f;
-            float height = width * 414f / 1080f;
-            float k = height / 414f;
-            Image panel = NewImage("Header", _root, headerSprite, new Vector2(width, height), new Vector2(0f, RefHeight * 0.5f - 40f - height * 0.5f));
-            _header = panel.rectTransform;
+            _header = NewRect("Header", _root);
+            _header.pivot = new Vector2(0.5f, 1f);
+            // Cao 0 + pivot trên: tâm khung trùng mép trên, nên toạ độ các phần con (anchor giữa) tính từ mép trên.
+            _header.sizeDelta = new Vector2(HeaderW, 0f);
+            _header.anchoredPosition = new Vector2(0f, HeaderTop);
 
-            // Dải cam (y 225..285 trên ảnh 414px): tiêu đề "FIND THE WORDS".
-            float bandY = height * 0.5f - 255f * k;
-            NewText("Title", _header, "FIND THE WORDS", 46f, Color.white, new Vector2(800f, 60f), new Vector2(-40f, bandY + 2f));
+            // 3 mảnh: trên | dải giữa kéo dài thêm _headerExtra | dưới. Không dùng Sliced để giữ tỉ lệ đều.
+            float topH = HeaderSplitPx * HeaderScale;
+            float bottomH = HeaderH - topH;
+            NewImage("Top", _header, headerTopSprite, new Vector2(HeaderW, topH), new Vector2(0f, -topH * 0.5f));
+            if (_headerExtra > 0f)
+            {
+                NewImage("Mid", _header, headerMidSprite, new Vector2(HeaderW, _headerExtra + 2f), new Vector2(0f, -topH - _headerExtra * 0.5f));
+            }
+            NewImage("Bottom", _header, headerBottomSprite, new Vector2(HeaderW, bottomH), new Vector2(0f, -topH - _headerExtra - bottomH * 0.5f));
 
-            // Dải kem (y 290..378): các thẻ từ xếp thành MỘT hàng. Thẻ vượt quá mép phải bị che (RectMask2D)
-            // và lộ dần ra khi các thẻ phía trước được clear.
-            float creamY = height * 0.5f - 334f * k;
-            BuildCards(creamY);
+            // Tab trên (ảnh 1080x414): chữ LEVEL có sẵn ở (370,118), số level ngay dưới; ô trắng timer x 450..765.
+            NewOutlinedText(_header, levelNumber.ToString(), 64f, Color.white, Brown, new Vector2(200f, 80f), new Vector2(HX(370f), HY(172f)), 4f);
+            _timerText = NewText("Timer", _header, "", 64f, Brown, new Vector2(260f, 90f), new Vector2(HX(660f), HY(150f)));
+            _timeLeft = timeLimit;
+            UpdateTimerText();
+
+            // Dải tím (y 225..285): chủ đề. Dải kem (y 290..378): dòng các từ.
+            string title = string.IsNullOrEmpty(categoryTitle) ? "WORDS" : categoryTitle.ToUpper();
+            NewText("Title", _header, title, 46f, Color.white, new Vector2(700f, 60f), new Vector2(-40f, HY(255f) + 2f));
+            BuildWordLine(HY(HeaderSplitPx) - _headerExtra * 0.5f);
         }
 
-        private const float CardSlotGap = 4f;
-        private const float CardGap = 30f;
-        private const float StripWidth = 890f;
-        private const float StripHeight = 80f;
-        private const float StripPadding = 14f;
-
-        private void BuildCards(float creamY)
+        private static float WordWidth(string word)
         {
-            _slotSize = 56f;
-            _cardsHeight = 0f;
-
-            _cardStrip = NewRect("CardStrip", _header);
-            _cardStrip.sizeDelta = new Vector2(StripWidth, StripHeight);
-            _cardStrip.anchoredPosition = new Vector2(0f, creamY);
-            _cardStrip.gameObject.AddComponent<RectMask2D>();
-
-            _cards = new WordCard[_words.Length];
-            _cardOrder = new List<int>();
-            for (int w = 0; w < _words.Length; w++)
+            float width = 0f;
+            for (int i = 0; i < word.Length; i++)
             {
-                string word = _words[w];
-                float cardWidth = CardWidth(word);
-                RectTransform cardRect = NewRect("Card_" + word, _cardStrip);
-                cardRect.sizeDelta = new Vector2(cardWidth, _slotSize);
-
-                WordCard card = new WordCard();
-                card.Rect = cardRect;
-                card.Group = cardRect.gameObject.AddComponent<CanvasGroup>();
-                card.Group.blocksRaycasts = false;
-                card.Slots = new Image[word.Length];
-                card.Labels = new TextMeshProUGUI[word.Length];
-                for (int i = 0; i < word.Length; i++)
-                {
-                    float sx = -cardWidth * 0.5f + _slotSize * 0.5f + i * (_slotSize + CardSlotGap);
-                    Image slot = NewImage("Slot" + i, cardRect, slotSprite, new Vector2(_slotSize, _slotSize), new Vector2(sx, 0f));
-                    TextMeshProUGUI label = NewText("Letter", slot.transform, word[i].ToString(), _slotSize * 0.64f, Brown, new Vector2(_slotSize, _slotSize), new Vector2(0f, 1f));
-                    label.alpha = 0.3f;
-                    card.Slots[i] = slot;
-                    card.Labels[i] = label;
-                }
-                _cards[w] = card;
-                _cardOrder.Add(w);
+                width += Advance(word[i]);
+                if (i > 0) width += LineTracking;
             }
-            LayoutCards(false);
+            return width;
         }
 
-        private float CardWidth(string word)
+        private static float WordSpace()
         {
-            return word.Length * _slotSize + (word.Length - 1) * CardSlotGap;
+            return LineFont * 0.42f;
         }
 
-        /// <summary>Xếp các thẻ trong _cardOrder sát nhau từ mép trái dải kem; có thể trượt tới vị trí mới.</summary>
-        private void LayoutCards(bool animate)
+        private float LineWidth(List<int> line)
         {
-            List<RectTransform> rects = new List<RectTransform>();
-            List<Vector2> targets = new List<Vector2>();
-            float x = -StripWidth * 0.5f + StripPadding;
-            for (int k = 0; k < _cardOrder.Count; k++)
+            float width = 0f;
+            for (int k = 0; k < line.Count; k++)
             {
-                WordCard card = _cards[_cardOrder[k]];
-                float cw = card.Rect.sizeDelta.x;
-                rects.Add(card.Rect);
-                targets.Add(new Vector2(x + cw * 0.5f, 0f));
-                x += cw + CardGap;
+                if (k > 0) width += WordSpace();
+                width += WordWidth(_words[line[k]]);
             }
-
-            _layoutVersion++;
-            if (!animate)
-            {
-                for (int k = 0; k < rects.Count; k++) rects[k].anchoredPosition = targets[k];
-                return;
-            }
-            StartCoroutine(SlideCards(rects, targets, _layoutVersion));
-        }
-
-        private IEnumerator SlideCards(List<RectTransform> rects, List<Vector2> targets, int version)
-        {
-            List<Vector2> starts = new List<Vector2>();
-            for (int k = 0; k < rects.Count; k++) starts.Add(rects[k].anchoredPosition);
-
-            const float duration = 0.2f;
-            float time = 0f;
-            while (time < duration)
-            {
-                if (version != _layoutVersion) yield break;
-                time += Time.deltaTime;
-                float t = PATween.OutCubic(Mathf.Clamp01(time / duration));
-                for (int k = 0; k < rects.Count; k++)
-                {
-                    if (rects[k] != null) rects[k].anchoredPosition = Vector2.LerpUnclamped(starts[k], targets[k], t);
-                }
-                yield return null;
-            }
-            if (version != _layoutVersion) yield break;
-            for (int k = 0; k < rects.Count; k++)
-            {
-                if (rects[k] != null) rects[k].anchoredPosition = targets[k];
-            }
+            return width;
         }
 
         /// <summary>
-        /// Trên web, Luna không cắt UI theo RectMask2D (cả Image lẫn chữ TextMeshPro vẫn lộ ra ngoài khung).
-        /// Tự ẩn cả ô và chữ của ô không nằm trọn trong dải kem.
+        /// Chia các từ thành dòng: vừa 1 dòng (cho phép thu nhỏ tới MinLineScale) thì giữ 1 dòng,
+        /// không thì xuống dòng theo từ, mỗi dòng căn giữa. Header kéo dài thêm cho các dòng mới.
         /// </summary>
-        private void UpdateCardClipping()
+        private void PrepareLineLayout()
         {
-            if (_cards == null || _cardStrip == null) return;
-            float left = -StripWidth * 0.5f;
-            float right = StripWidth * 0.5f;
-            for (int w = 0; w < _cards.Length; w++)
+            _lines = new List<List<int>>();
+            List<int> all = new List<int>();
+            for (int w = 0; w < _words.Length; w++) all.Add(w);
+            float total = LineWidth(all);
+            if (LineMaxWidth / total >= MinLineScale)
             {
-                WordCard card = _cards[w];
-                if (card == null || !card.Rect.gameObject.activeSelf) continue;
-                float cardX = card.Rect.anchoredPosition.x;
-                float scale = card.Rect.localScale.x;
-                for (int i = 0; i < card.Slots.Length; i++)
+                _lines.Add(all);
+                _lineScale = Mathf.Min(1f, LineMaxWidth / total);
+            }
+            else
+            {
+                List<int> current = new List<int>();
+                float width = 0f;
+                for (int w = 0; w < _words.Length; w++)
                 {
-                    RectTransform slot = card.Slots[i].rectTransform;
-                    float center = cardX + slot.anchoredPosition.x * scale;
-                    float half = _slotSize * 0.5f * scale;
-                    bool inside = center - half >= left - 0.5f && center + half <= right + 0.5f;
-                    if (card.Labels[i].enabled != inside) card.Labels[i].enabled = inside;
-                    if (card.Slots[i].enabled != inside) card.Slots[i].enabled = inside;
+                    float ww = WordWidth(_words[w]);
+                    if (current.Count > 0 && width + WordSpace() + ww > LineMaxWidth)
+                    {
+                        _lines.Add(current);
+                        current = new List<int>();
+                        width = 0f;
+                    }
+                    if (current.Count > 0) width += WordSpace();
+                    current.Add(w);
+                    width += ww;
+                }
+                if (current.Count > 0) _lines.Add(current);
+                _lineScale = 1f;
+                for (int l = 0; l < _lines.Count; l++) _lineScale = Mathf.Min(_lineScale, LineMaxWidth / LineWidth(_lines[l]));
+            }
+            _headerExtra = (_lines.Count - 1) * LineSpacing * _lineScale;
+        }
+
+        /// <summary>Vị trí khay, board, ô thông báo phụ thuộc chiều cao header; board thu nhỏ nếu thiếu chỗ.</summary>
+        private void ComputeLayout()
+        {
+            float headerBottom = HeaderTop - HeaderH - _headerExtra;
+            _trayY = headerBottom - 30f - TraySlot * 0.5f;
+            _boardTop = _trayY - TraySlot * 0.5f - 40f;
+            float boardH = Rows * CellH;
+            _boardScale = Mathf.Clamp((_boardTop - MinBoardBottom) / boardH, 0.6f, 1f);
+            _messageY = _boardTop - boardH * _boardScale - 62f;
+        }
+
+        private void BuildWordLine(float y)
+        {
+            _wordLine = NewRect("WordLine", _header);
+            _wordLine.anchoredPosition = new Vector2(0f, y);
+            _wordLine.localScale = new Vector3(_lineScale, _lineScale, 1f);
+
+            _lineLabels = new TextMeshProUGUI[_words.Length][];
+            for (int l = 0; l < _lines.Count; l++)
+            {
+                List<int> line = _lines[l];
+                float lineY = ((_lines.Count - 1) * 0.5f - l) * LineSpacing;
+                float x = -LineWidth(line) * 0.5f;
+                for (int k = 0; k < line.Count; k++)
+                {
+                    int w = line[k];
+                    if (k > 0) x += WordSpace();
+                    _lineLabels[w] = new TextMeshProUGUI[_words[w].Length];
+                    for (int i = 0; i < _words[w].Length; i++)
+                    {
+                        if (i > 0) x += LineTracking;
+                        float adv = Advance(_words[w][i]);
+                        TextMeshProUGUI label = NewText("L_" + _words[w][i], _wordLine, _words[w][i].ToString(), LineFont, PendingColor, new Vector2(adv + 30f, LineFont * 1.3f), new Vector2(x + adv * 0.5f, lineY));
+                        _lineLabels[w][i] = label;
+                        x += adv;
+                    }
                 }
             }
         }
 
-        /// <summary>Đưa thẻ của từ vừa tìm lên vị trí đầu (nếu nó đang ở sau/bị che) để chữ bay vào chỗ nhìn thấy.</summary>
-        private void BringCardToFront(int wordIndex)
+        private static float Advance(char ch)
         {
-            int pos = _cardOrder.IndexOf(wordIndex);
-            if (pos <= 0) return;
-            _cardOrder.RemoveAt(pos);
-            _cardOrder.Insert(0, wordIndex);
-            LayoutCards(true);
+            if (ch < 'A' || ch > 'Z') return LineFont * 0.6f;
+            return LetterAdvance[ch - 'A'] * LineFont / 100f;
         }
 
-        /// <summary>Thẻ đã clear: phồng nhẹ rồi thu nhỏ + mờ dần, sau đó các thẻ phía sau trượt lên lấp chỗ.</summary>
-        private IEnumerator RemoveCard(int wordIndex)
+        private static void SetLabelColor(TextMeshProUGUI label, Color color)
         {
-            WordCard card = _cards[wordIndex];
-            yield return new WaitForSeconds(0.25f);
-
-            const float duration = 0.3f;
-            float time = 0f;
-            while (time < duration)
-            {
-                time += Time.deltaTime;
-                float t = Mathf.Clamp01(time / duration);
-                float s = t < 0.3f ? Mathf.Lerp(1f, 1.12f, t / 0.3f) : Mathf.Lerp(1.12f, 0f, PATween.InCubic((t - 0.3f) / 0.7f));
-                card.Rect.localScale = new Vector3(s, s, 1f);
-                card.Group.alpha = 1f - PATween.InCubic(t);
-                yield return null;
-            }
-            card.Rect.gameObject.SetActive(false);
-
-            _cardOrder.Remove(wordIndex);
-            LayoutCards(true);
+            label.color = color;
         }
 
-
-        private void BuildBoard()
+        private void UpdateTimerText()
         {
-            // Board nằm ngay dưới vùng thẻ từ (vị trí phụ thuộc số hàng thẻ).
-            float cardsBottom = _header.anchoredPosition.y - _header.sizeDelta.y * 0.5f - _cardsHeight;
-            float boardTop = cardsBottom - 18f;
-            float boardHeight = CellH * GridSize;
-            _board = NewRect("Board", _root);
-            _board.sizeDelta = new Vector2(CellW * GridSize, boardHeight);
-            _board.anchoredPosition = new Vector2(0f, boardTop - boardHeight * 0.5f);
-            _messageY = boardTop - boardHeight - 70f;
+            int seconds = Mathf.CeilToInt(_timeLeft);
+            if (seconds == _shownSeconds) return;
+            _shownSeconds = seconds;
+            int m = seconds / 60;
+            int s = seconds % 60;
+            _timerText.text = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+            _timerText.color = seconds <= 10 ? new Color32(214, 40, 30, 255) : Brown;
+        }
 
-            // Sinh board cố định (seed cố định): chữ nhiễu ở mọi ô, rồi rải chữ của từng từ vào các ô ngẫu nhiên,
-            // ưu tiên không kề nhau với chữ cùng từ để từ không bị "lộ" thành một hàng.
-            PARandom rng = new PARandom(BoardSeed);
-            char[,] letters = new char[GridSize, GridSize];
-            bool[,] occupied = new bool[GridSize, GridSize];
-            for (int r = 0; r < GridSize; r++)
+        private void BuildTray()
+        {
+            _trayLayer = NewRect("Tray", _root);
+            _trayLayer.anchoredPosition = new Vector2(0f, _trayY);
+            _traySlots = new Image[TraySize];
+            _trayWarnings = new Image[TraySize];
+            for (int i = 0; i < TraySize; i++)
             {
-                for (int c = 0; c < GridSize; c++) letters[r, c] = _filler[rng.Range(0, _filler.Length)];
+                float x = (i - (TraySize - 1) * 0.5f) * (TraySlot + TrayGap);
+                Image warn = NewImage("Warn" + i, _trayLayer, trayWarningSprite, new Vector2(TraySlot * 1.25f, TraySlot * 1.25f), new Vector2(x, 0f));
+                warn.enabled = false;
+                _trayWarnings[i] = warn;
+                Image slot = NewImage("Slot" + i, _trayLayer, slotSprite, new Vector2(TraySlot, TraySlot), new Vector2(x, 0f));
+                slot.color = new Color32(255, 243, 214, 255);
+                _traySlots[i] = slot;
             }
+        }
 
-            int[][] cellsOf = new int[_words.Length][];
-            for (int w = 0; w < _words.Length; w++)
+        private void BuildStarBar()
+        {
+            float width = _target * StarSpacing + 70f;
+            Image pill = NewImage("StarBar", _root, pillSprite, new Vector2(width, 108f), new Vector2(0f, StarBarY));
+            pill.type = Image.Type.Sliced;
+            pill.color = new Color(0.22f, 0.04f, 0.33f, 0.62f);
+            _starBar = pill.rectTransform;
+
+            _stars = new Image[_target];
+            for (int k = 0; k < _target; k++)
             {
-                string word = _words[w];
-                cellsOf[w] = new int[word.Length];
-                for (int i = 0; i < word.Length; i++)
+                float x = (k - (_target - 1) * 0.5f) * StarSpacing;
+                if (k > 0)
                 {
-                    int cell = PickCell(rng, occupied, cellsOf[w], i, w == 0);
-                    cellsOf[w][i] = cell;
-                    occupied[cell / GridSize, cell % GridSize] = true;
-                    letters[cell / GridSize, cell % GridSize] = word[i];
+                    Image link = NewImage("Link", _starBar, null, new Vector2(StarSpacing - 70f, 10f), new Vector2(x - StarSpacing * 0.5f, 0f));
+                    link.color = new Color(1f, 1f, 1f, 0.35f);
                 }
+                _stars[k] = NewImage("Star" + k, _starBar, starOffSprite, new Vector2(92f, 92f), new Vector2(x, 2f));
             }
-
-            _tiles = new LetterTile[GridSize, GridSize];
-            for (int r = 0; r < GridSize; r++)
-            {
-                for (int c = 0; c < GridSize; c++)
-                {
-                    _tiles[r, c] = CreateTile(letters[r, c], r, c, CellPosition(r, c));
-                }
-            }
-
-            _wordTiles = new LetterTile[_words.Length][];
-            for (int w = 0; w < _words.Length; w++)
-            {
-                _wordTiles[w] = new LetterTile[_words[w].Length];
-                for (int i = 0; i < _words[w].Length; i++)
-                {
-                    int cell = cellsOf[w][i];
-                    _wordTiles[w][i] = _tiles[cell / GridSize, cell % GridSize];
-                }
-            }
-        }
-
-        /// <summary>
-        /// Chọn một ô trống cho chữ thứ <paramref name="count"/> của từ. Ưu tiên ô không kề (8 hướng) với các chữ
-        /// đã đặt của cùng từ; từ tutorial tránh viền ngoài để bàn tay chỉ dễ nhìn.
-        /// </summary>
-        private static int PickCell(PARandom rng, bool[,] occupied, int[] placed, int count, bool inner)
-        {
-            for (int attempt = 0; attempt < 200; attempt++)
-            {
-                int r = rng.Range(0, GridSize);
-                int c = rng.Range(0, GridSize);
-                if (occupied[r, c]) continue;
-                if (inner && attempt < 150 && (r == 0 || c == 0 || r == GridSize - 1 || c == GridSize - 1)) continue;
-
-                bool adjacent = false;
-                for (int k = 0; k < count && attempt < 120; k++)
-                {
-                    int pr = placed[k] / GridSize;
-                    int pc = placed[k] % GridSize;
-                    if (Mathf.Abs(pr - r) <= 1 && Mathf.Abs(pc - c) <= 1) adjacent = true;
-                }
-                if (adjacent) continue;
-                return r * GridSize + c;
-            }
-
-            for (int cell = 0; cell < GridSize * GridSize; cell++)
-            {
-                if (!occupied[cell / GridSize, cell % GridSize]) return cell;
-            }
-            return 0;
-        }
-
-        private static Vector2 CellPosition(int row, int col)
-        {
-            return new Vector2((col - (GridSize - 1) * 0.5f) * CellW, ((GridSize - 1) * 0.5f - row) * CellH);
-        }
-
-        private LetterTile CreateTile(char letter, int row, int col, Vector2 pos)
-        {
-            Image bg = NewImage("Tile_" + row + "_" + col, _board, tileSprite, new Vector2(TileW, TileH), pos);
-            bg.raycastTarget = true;
-            TextMeshProUGUI label = NewText("Letter", bg.transform, letter.ToString(), 60f, LetterTile.LetterColor, new Vector2(TileW, TileH), new Vector2(0f, 6f));
-
-            LetterTile tile = bg.gameObject.AddComponent<LetterTile>();
-            tile.Letter = letter;
-            tile.Row = row;
-            tile.Col = col;
-            tile.Rect = bg.rectTransform;
-            tile.Background = bg;
-            tile.Label = label;
-            tile.Tapped = OnTileTapped;
-            return tile;
         }
 
         private void BuildTopLayers()
         {
-            RectTransform overlayRect = NewRect("TutorialOverlay", _canvasRect);
-            Stretch(overlayRect);
-            Image dark = overlayRect.gameObject.AddComponent<Image>();
-            dark.color = new Color(0f, 0f, 0f, 0.72f);
-            dark.raycastTarget = true;
-            _overlay = overlayRect.gameObject.AddComponent<CanvasGroup>();
-            _overlay.alpha = 0f;
-            overlayRect.gameObject.SetActive(false);
-
             _rootTop = NewRect("RootTop", _canvasRect);
             _rootTop.sizeDelta = new Vector2(RefWidth, RefHeight);
-
-            _focusLayer = NewRect("FocusLayer", _rootTop);
             _fxLayer = NewRect("FxLayer", _rootTop);
 
-            Image pill = NewImage("Message", _rootTop, null, new Vector2(820f, 96f), new Vector2(0f, _messageY));
-            pill.color = new Color(0.25f, 0.12f, 0.04f, 0.65f);
+            Image pill = NewImage("Message", _rootTop, pillSprite, new Vector2(760f, 86f), new Vector2(0f, _messageY));
+            pill.type = Image.Type.Sliced;
+            pill.color = new Color(0.25f, 0.06f, 0.36f, 0.78f);
             _messageGroup = pill.gameObject.AddComponent<CanvasGroup>();
             _messageGroup.blocksRaycasts = false;
-            _message = NewText("Text", pill.transform, "", 46f, Color.white, new Vector2(800f, 90f), new Vector2(0f, 2f));
+            _message = NewText("Text", pill.transform, "", 44f, Color.white, new Vector2(720f, 80f), new Vector2(0f, 2f));
 
             Image hand = NewImage("Hand", _rootTop, handSprite, new Vector2(150f, 150f * 173f / 181f), Vector2.zero);
             _hand = hand.rectTransform;
             _hand.pivot = new Vector2(0.1f, 0.92f);
             _hand.gameObject.SetActive(false);
+
+            RectTransform flashRect = NewRect("RedFlash", _canvasRect);
+            Stretch(flashRect);
+            _flash = flashRect.gameObject.AddComponent<Image>();
+            _flash.color = new Color(1f, 0.05f, 0.05f, 0f);
+            _flash.raycastTarget = false;
+
+            // Viền đỏ quanh màn hình (TrayWarningEdges của game gốc, màu trắng -> tô đỏ).
+            RectTransform edgesRect = NewRect("RedEdges", _canvasRect);
+            Stretch(edgesRect);
+            _flashEdges = edgesRect.gameObject.AddComponent<Image>();
+            _flashEdges.sprite = flashEdgesSprite;
+            _flashEdges.color = new Color(1f, 0.08f, 0.05f, 0f);
+            _flashEdges.raycastTarget = false;
+        }
+
+        /// <summary>Thanh dưới cùng: logo + tên app + nút PLAY NOW. Luôn hiển thị, bấm vào mở store.</summary>
+        private void BuildBottomBar()
+        {
+            _bottomBar = NewRect("BottomBar", _canvasRect);
+            _bottomBar.anchorMin = new Vector2(0f, 0f);
+            _bottomBar.anchorMax = new Vector2(1f, 0f);
+            _bottomBar.pivot = new Vector2(0.5f, 0f);
+            _bottomBar.sizeDelta = new Vector2(0f, BottomBarHeight);
+            _bottomBar.anchoredPosition = Vector2.zero;
+            Image bg = _bottomBar.gameObject.AddComponent<Image>();
+            bg.color = new Color(1f, 0.98f, 0.93f, 0.97f);
+            bg.raycastTarget = true;
+            Button barButton = _bottomBar.gameObject.AddComponent<Button>();
+            barButton.transition = Selectable.Transition.None;
+            barButton.onClick.AddListener(OpenStore);
+
+            RectTransform line = NewRect("TopLine", _bottomBar);
+            line.anchorMin = new Vector2(0f, 1f);
+            line.anchorMax = new Vector2(1f, 1f);
+            line.pivot = new Vector2(0.5f, 1f);
+            line.sizeDelta = new Vector2(0f, 8f);
+            line.anchoredPosition = Vector2.zero;
+            Image lineImg = line.gameObject.AddComponent<Image>();
+            lineImg.color = new Color32(150, 20, 200, 255);
+            lineImg.raycastTarget = false;
+
+            const float logoH = 160f;
+            float logoW = logoH * 1050f / 719f;
+            Image logo = NewImage("Logo", _bottomBar, logoSprite, new Vector2(logoW, logoH), new Vector2(24f + logoW * 0.5f, -4f));
+            AnchorLeft(logo.rectTransform);
+
+            TextMeshProUGUI name = NewText("AppName", _bottomBar, "Tile Word\nExplorer", 44f, Brown, new Vector2(300f, 150f), new Vector2(24f + logoW + 14f + 150f, -4f));
+            name.alignment = TextAlignmentOptions.Left;
+            name.lineSpacing = -12f;
+            AnchorLeft(name.rectTransform);
+
+            Vector2 buttonSize = new Vector2(330f, 330f * 237f / 537f);
+            Image button = NewImage("PlayNow", _bottomBar, buttonSprite, buttonSize, new Vector2(-24f - buttonSize.x * 0.5f, -2f));
+            button.rectTransform.anchorMin = new Vector2(1f, 0.5f);
+            button.rectTransform.anchorMax = new Vector2(1f, 0.5f);
+            button.raycastTarget = true;
+            Button play = button.gameObject.AddComponent<Button>();
+            play.transition = Selectable.Transition.None;
+            play.onClick.AddListener(OpenStore);
+            NewOutlinedText(button.transform, "PLAY NOW", 54f, Color.white, new Color32(206, 84, 8, 255), new Vector2(320f, 120f), new Vector2(0f, 6f), 3.5f);
+            _ctaButton = button.rectTransform;
+        }
+
+        private static void AnchorLeft(RectTransform rt)
+        {
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(0f, 0.5f);
         }
 
         private void ShowMessage(string text)
         {
             _message.text = text;
             StartCoroutine(MessageRoutine());
+        }
+
+        private void HideMessage()
+        {
+            StartCoroutine(PATween.Fade(_messageGroup, _messageGroup.alpha, 0f, 0.2f));
         }
 
         private IEnumerator MessageRoutine()
@@ -1351,7 +1512,6 @@ namespace PA.TileWord
             _background.sizeDelta = new Vector2(RefWidth * cover, RefHeight * cover);
         }
 
-        // ================================================================ helpers
         // ================================================================ audio
         private void SetupAudio()
         {
@@ -1407,6 +1567,7 @@ namespace PA.TileWord
             src.Play();
         }
 
+        // ================================================================ helpers
         private static RectTransform NewRect(string name, Transform parent)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
@@ -1452,6 +1613,22 @@ namespace PA.TileWord
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.raycastTarget = false;
             return tmp;
+        }
+
+        /// <summary>Chữ có viền giả: 8 bản sao lệch quanh chữ chính + bóng (không cần material outline của TMP).</summary>
+        private TextMeshProUGUI NewOutlinedText(Transform parent, string text, float fontSize, Color fill, Color outline, Vector2 size, Vector2 pos, float o)
+        {
+            Vector2[] offsets =
+            {
+                new Vector2(-o, 0f), new Vector2(o, 0f), new Vector2(0f, -o), new Vector2(0f, o),
+                new Vector2(-o, -o), new Vector2(o, -o), new Vector2(-o, o), new Vector2(o, o),
+            };
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                NewText("Outline", parent, text, fontSize, outline, size, pos + offsets[i]);
+            }
+            NewText("Shadow", parent, text, fontSize, outline, size, pos + new Vector2(0f, -o * 2f));
+            return NewText("Label", parent, text, fontSize, fill, size, pos);
         }
     }
 }

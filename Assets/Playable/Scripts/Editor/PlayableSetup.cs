@@ -70,6 +70,18 @@ namespace PA.TileWord.EditorTools
         }
 
         // ------------------------------------------------------------ textures
+        private static readonly string[] BigTextures =
+        {
+            "InGameBg.png", "TitleLogo.png", "StageInfoPanelTop.png", "StageInfoPanelMid.png", "StageInfoPanelBottom.png", "PlayButton.png", "PlayButtonHard.png",
+            "ResultNicePopupPanel.png", "ResultLosePopupPanel.png",
+        };
+
+        private static readonly string[] MediumTextures = { "lose-icon-only.png" };
+
+        // Ô bo tròn TrayWarningBar (128px, bán kính góc ~44px) dùng kiểu Sliced cho pill thanh sao / thông báo.
+        private const string SlicedTexture = "TrayWarningBar.png";
+        private static readonly Vector4 SlicedBorder = new Vector4(46f, 46f, 46f, 46f);
+
         private static void ConfigureTextures()
         {
             string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { Root + "/Art" });
@@ -79,14 +91,17 @@ namespace PA.TileWord.EditorTools
                 TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
                 if (importer == null) continue;
 
-                bool big = path.EndsWith("InGameBg.png") || path.EndsWith("TitleLogo.png") || path.EndsWith("StageInfoPanel-no-timer.png") || path.EndsWith("PlayButton.png");
-                int maxSize = big ? 1024 : 256;
+                string file = System.IO.Path.GetFileName(path);
+                int maxSize = 256;
+                if (Array.IndexOf(BigTextures, file) >= 0) maxSize = 1024;
+                else if (Array.IndexOf(MediumTextures, file) >= 0) maxSize = 512;
 
                 bool changed = false;
                 if (importer.textureType != TextureImporterType.Sprite) { importer.textureType = TextureImporterType.Sprite; changed = true; }
                 if (importer.spriteImportMode != SpriteImportMode.Single) { importer.spriteImportMode = SpriteImportMode.Single; changed = true; }
                 if (importer.mipmapEnabled) { importer.mipmapEnabled = false; changed = true; }
                 if (importer.maxTextureSize != maxSize) { importer.maxTextureSize = maxSize; changed = true; }
+                if (file == SlicedTexture && importer.spriteBorder != SlicedBorder) { importer.spriteBorder = SlicedBorder; changed = true; }
                 if (changed) importer.SaveAndReimport();
             }
         }
@@ -179,11 +194,23 @@ namespace PA.TileWord.EditorTools
             game.backgroundSprite = LoadSprite("InGameBg");
             game.tileSprite = LoadSprite("LetterTile");
             game.slotSprite = LoadSprite("LetterTray");
-            game.headerSprite = LoadSprite("StageInfoPanel-no-timer");
+            game.headerTopSprite = LoadSprite("StageInfoPanelTop");
+            game.headerMidSprite = LoadSprite("StageInfoPanelMid");
+            game.headerBottomSprite = LoadSprite("StageInfoPanelBottom");
             game.logoSprite = LoadSprite("TitleLogo");
             game.buttonSprite = LoadSprite("PlayButton");
+            game.hardButtonSprite = LoadSprite("PlayButtonHard");
             game.handSprite = LoadSprite("Tutorial_Focus_Icon_Hand");
             game.sparkleSprite = LoadSprite("UnlockSparkle");
+            game.starOnSprite = LoadSprite("symc_star");
+            game.starOffSprite = LoadSprite("sym_star");
+            game.crossSprite = LoadSprite("cross");
+            game.pillSprite = LoadSprite("TrayWarningBar");
+            game.flashEdgesSprite = LoadSprite("TrayWarningEdges");
+            game.trayWarningSprite = LoadSprite("LetterTrayWarning");
+            game.winPanelSprite = LoadSprite("ResultNicePopupPanel");
+            game.losePanelSprite = LoadSprite("ResultLosePopupPanel");
+            game.loseIconSprite = LoadSprite("lose-icon-only");
             game.font = font;
             game.music = LoadClip("music_main");
             game.sfxTap = LoadClip("tile click");

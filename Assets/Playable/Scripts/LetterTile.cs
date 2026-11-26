@@ -6,12 +6,11 @@ using UnityEngine.UI;
 
 namespace PA.TileWord
 {
-    /// <summary>Một ô chữ trên bảng 10×10.</summary>
+    /// <summary>Một ô chữ trên board (hoặc trong khay sau khi chọn sai).</summary>
     public class LetterTile : MonoBehaviour, IPointerDownHandler
     {
         public static readonly Color NormalColor = Color.white;
-        public static readonly Color SelectedColor = new Color(1f, 0.84f, 0.42f, 1f);
-        public static readonly Color WrongColor = new Color(1f, 0.62f, 0.55f, 1f);
+        public static readonly Color WrongColor = new Color(1f, 0.55f, 0.5f, 1f);
         public static readonly Color LetterColor = new Color32(107, 58, 30, 255);
 
         public char Letter;
@@ -21,53 +20,77 @@ namespace PA.TileWord
         public Image Background;
         public TextMeshProUGUI Label;
 
-        public bool Selected { get; private set; }
+        /// <summary>Đã rời board (đang bay về từ / khay). Không nhận tap nữa.</summary>
         public bool Used;
 
         public System.Action<LetterTile> Tapped;
+        public System.Action<LetterTile> Landed;
 
-        private Coroutine _shake;
-        private Vector2 _shakeBase;
+        private Coroutine _move;
 
         public void OnPointerDown(PointerEventData eventData)
         {
             if (Tapped != null) Tapped(this);
         }
 
-        public void SetSelected(bool selected)
+        /// <summary>Rơi tới vị trí <paramref name="target"/> (anchoredPosition) sau <paramref name="delay"/> giây; hủy lần rơi trước.</summary>
+        public void FallTo(Vector2 from, Vector2 target, float delay, float duration)
         {
-            Selected = selected;
-            Background.color = selected ? SelectedColor : NormalColor;
-            Rect.localScale = selected ? new Vector3(1.08f, 1.08f, 1f) : Vector3.one;
+            StopMove();
+            Rect.anchoredPosition = from;
+            _move = StartCoroutine(FallRoutine(from, target, delay, duration));
         }
 
-        /// <summary>Rung nhẹ khi chọn sai chữ (không tính là thua).</summary>
-        public void Shake()
+        /// <summary>Ô mới xuất hiện tại chỗ: phóng to từ 0 (không bay ngang qua khay/header).</summary>
+        public void PopIn(float delay)
         {
-            if (_shake != null)
-            {
-                StopCoroutine(_shake);
-                Rect.anchoredPosition = _shakeBase;
-            }
-            _shakeBase = Rect.anchoredPosition;
-            _shake = StartCoroutine(ShakeRoutine());
+            Rect.localScale = Vector3.zero;
+            StartCoroutine(PopRoutine(delay));
         }
 
-        private IEnumerator ShakeRoutine()
+        private IEnumerator PopRoutine(float delay)
         {
-            const float duration = 0.32f;
-            float time = 0f;
-            Background.color = WrongColor;
+            float time = -delay;
+            const float duration = 0.25f;
             while (time < duration)
             {
                 time += Time.deltaTime;
-                float k = 1f - Mathf.Clamp01(time / duration);
-                Rect.anchoredPosition = _shakeBase + new Vector2(Mathf.Sin(time * 70f) * 12f * k, 0f);
+                if (Used) yield break;
+                float s = time <= 0f ? 0f : PATween.OutBack(Mathf.Clamp01(time / duration));
+                Rect.localScale = new Vector3(s, s, 1f);
                 yield return null;
             }
-            Rect.anchoredPosition = _shakeBase;
-            Background.color = Selected ? SelectedColor : NormalColor;
-            _shake = null;
+            if (!Used) Rect.localScale = Vector3.one;
+        }
+
+        public void StopMove()
+        {
+            if (_move != null)
+            {
+                StopCoroutine(_move);
+                _move = null;
+            }
+        }
+
+        private IEnumerator FallRoutine(Vector2 from, Vector2 target, float delay, float duration)
+        {
+            float time = -delay;
+            bool landed = false;
+            while (time < duration)
+            {
+                time += Time.deltaTime;
+                float t = Mathf.Clamp01(time / duration);
+                Rect.anchoredPosition = Vector2.LerpUnclamped(from, target, PATween.OutBounce(t));
+                // OutBounce chạm đích ở t = 0.7.
+                if (!landed && t >= 0.7f)
+                {
+                    landed = true;
+                    if (Landed != null) Landed(this);
+                }
+                yield return null;
+            }
+            Rect.anchoredPosition = target;
+            _move = null;
         }
     }
 }
