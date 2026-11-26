@@ -79,7 +79,7 @@ namespace PA.TileWord.EditorTools
                 TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
                 if (importer == null) continue;
 
-                bool big = path.EndsWith("InGameBg.png") || path.EndsWith("TitleLogo.png") || path.EndsWith("StageInfoPanel-no-timer.png") || path.EndsWith("PlayButton.png");
+                bool big = path.EndsWith("InGameBg.png") || path.EndsWith("TitleLogo.png") || path.EndsWith("StageInfoPanelTop.png") || path.EndsWith("StageInfoPanelMid.png") || path.EndsWith("StageInfoPanelBottom.png") || path.EndsWith("PlayButton.png");
                 int maxSize = big ? 1024 : 256;
 
                 bool changed = false;
@@ -179,7 +179,9 @@ namespace PA.TileWord.EditorTools
             game.backgroundSprite = LoadSprite("InGameBg");
             game.tileSprite = LoadSprite("LetterTile");
             game.slotSprite = LoadSprite("LetterTray");
-            game.headerSprite = LoadSprite("StageInfoPanel-no-timer");
+            game.headerTopSprite = LoadSprite("StageInfoPanelTop");
+            game.headerMidSprite = LoadSprite("StageInfoPanelMid");
+            game.headerBottomSprite = LoadSprite("StageInfoPanelBottom");
             game.logoSprite = LoadSprite("TitleLogo");
             game.buttonSprite = LoadSprite("PlayButton");
             game.handSprite = LoadSprite("Tutorial_Focus_Icon_Hand");

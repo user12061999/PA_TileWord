@@ -18,7 +18,9 @@ namespace PA.TileWord
         public Sprite backgroundSprite;
         public Sprite tileSprite;
         public Sprite slotSprite;
-        public Sprite headerSprite;
+        public Sprite headerTopSprite;     // StageInfoPanel-no-timer: phần trên (tiêu đề, nửa trên dải kem)
+        public Sprite headerMidSprite;     // dải 1px giữa dải kem, kéo dài khi thẻ từ xuống nhiều dòng
+        public Sprite headerBottomSprite;  // phần dưới dải kem + viền đáy
         public Sprite logoSprite;
         public Sprite buttonSprite;
         public Sprite handSprite;
@@ -85,10 +87,9 @@ namespace PA.TileWord
         // Chữ "nhiễu" lấp board: các chữ không xuất hiện trong bất kỳ từ nào để người chơi không bị nhầm.
         private string _filler;
         private float _slotSize = 60f;
-        private float _cardsHeight;
-        private RectTransform _cardStrip;
-        private List<int> _cardOrder;
-        private int _layoutVersion;
+        private List<List<int>> _lines;
+        private float _lineScale = 1f;
+        private float _headerExtra;
         private float _messageY = -650f;
 
         private static readonly Color Brown = new Color32(107, 58, 30, 255);
@@ -161,7 +162,6 @@ namespace PA.TileWord
         private void Update()
         {
             UpdateLayout();
-            UpdateCardClipping();
 
             if (_phase == Phase.Free && _handTarget == null && _flyingLetters == 0 && _refilling == 0)
             {
@@ -567,7 +567,6 @@ namespace PA.TileWord
             _flyingLetters += letters.Count;
             bool wasTutorial = _phase == Phase.Tutorial;
             Play(sfxStreak, 0.8f, 1f);
-            BringCardToFront(wordIndex);
 
             for (int i = 0; i < letters.Count; i++)
             {
@@ -632,7 +631,6 @@ namespace PA.TileWord
                 SpawnSparkle(cardPos + offset, Random.Range(50f, 90f), Random.Range(0.4f, 0.7f));
             }
             yield return StartCoroutine(PATween.Punch(card.Rect, 0.2f, 0.3f));
-            StartCoroutine(RemoveCard(wordIndex));
 
             _foundCount++;
             _idleTime = 0f;
@@ -748,7 +746,7 @@ namespace PA.TileWord
             Vector2 p2 = _fxLayer.InverseTransformPoint(slot.position);
             Vector2 p1 = (p0 + p2) * 0.5f + new Vector2(Random.Range(-160f, 160f), 260f);
             float startScale = tile.Rect.localScale.x;
-            float endScale = _slotSize / TileH;
+            float endScale = _slotSize * _lineScale / TileH;
 
             const float duration = 0.55f;
             float time = 0f;
@@ -1001,68 +999,50 @@ namespace PA.TileWord
             _root.sizeDelta = new Vector2(RefWidth, RefHeight);
         }
 
-        private void BuildHeader()
-        {
-            float width = 1000f;
-            float height = width * 414f / 1080f;
-            float k = height / 414f;
-            Image panel = NewImage("Header", _root, headerSprite, new Vector2(width, height), new Vector2(0f, RefHeight * 0.5f - 40f - height * 0.5f));
-            _header = panel.rectTransform;
-
-            // Dải cam (y 225..285 trên ảnh 414px): tiêu đề "FIND THE WORDS".
-            float bandY = height * 0.5f - 255f * k;
-            NewText("Title", _header, "FIND THE WORDS", 46f, Color.white, new Vector2(800f, 60f), new Vector2(-40f, bandY + 2f));
-
-            // Dải kem (y 290..378): các thẻ từ xếp thành MỘT hàng. Thẻ vượt quá mép phải bị che (RectMask2D)
-            // và lộ dần ra khi các thẻ phía trước được clear.
-            float creamY = height * 0.5f - 334f * k;
-            BuildCards(creamY);
-        }
+        private const float HeaderW = 1000f;
+        private const float HeaderH = HeaderW * 414f / 1080f;
+        private const float HeaderScale = HeaderW / 1080f;
+        private const float HeaderTop = RefHeight * 0.5f - 40f;
+        // Ảnh header 1080x414 cắt ở hàng 334 (giữa dải kem 290..378) thành 3 mảnh: trên | dải giữa | dưới.
+        private const float HeaderSplitPx = 334f;
 
         private const float CardSlotGap = 4f;
         private const float CardGap = 30f;
-        private const float StripWidth = 890f;
-        private const float StripHeight = 80f;
-        private const float StripPadding = 14f;
+        private const float CardRowGap = 12f;
+        private const float LineMaxWidth = 862f;
+        // Thu nhỏ hàng thẻ tối đa tới mức này trước khi xuống dòng.
+        private const float MinLineScale = 0.9f;
 
-        private void BuildCards(float creamY)
+        // Toạ độ trên ảnh header (px, gốc trên-trái) -> toạ độ trong khung header (pivot ở mép trên).
+        private static float HX(float px) { return (px - 540f) * HeaderScale; }
+        private static float HY(float py) { return -py * HeaderScale; }
+
+        private void BuildHeader()
         {
             _slotSize = 56f;
-            _cardsHeight = 0f;
+            PrepareCardLines();
 
-            _cardStrip = NewRect("CardStrip", _header);
-            _cardStrip.sizeDelta = new Vector2(StripWidth, StripHeight);
-            _cardStrip.anchoredPosition = new Vector2(0f, creamY);
-            _cardStrip.gameObject.AddComponent<RectMask2D>();
+            // Cao 0 + pivot trên: tâm khung trùng mép trên, nên toạ độ các phần con (anchor giữa) tính từ mép trên.
+            _header = NewRect("Header", _root);
+            _header.pivot = new Vector2(0.5f, 1f);
+            _header.sizeDelta = new Vector2(HeaderW, 0f);
+            _header.anchoredPosition = new Vector2(0f, HeaderTop);
 
-            _cards = new WordCard[_words.Length];
-            _cardOrder = new List<int>();
-            for (int w = 0; w < _words.Length; w++)
+            // 3 mảnh ảnh: dải giữa kéo dài thêm _headerExtra khi thẻ từ xuống nhiều dòng (không dùng Sliced để giữ tỉ lệ đều).
+            float topH = HeaderSplitPx * HeaderScale;
+            float bottomH = HeaderH - topH;
+            NewImage("Top", _header, headerTopSprite, new Vector2(HeaderW, topH), new Vector2(0f, -topH * 0.5f));
+            if (_headerExtra > 0f)
             {
-                string word = _words[w];
-                float cardWidth = CardWidth(word);
-                RectTransform cardRect = NewRect("Card_" + word, _cardStrip);
-                cardRect.sizeDelta = new Vector2(cardWidth, _slotSize);
-
-                WordCard card = new WordCard();
-                card.Rect = cardRect;
-                card.Group = cardRect.gameObject.AddComponent<CanvasGroup>();
-                card.Group.blocksRaycasts = false;
-                card.Slots = new Image[word.Length];
-                card.Labels = new TextMeshProUGUI[word.Length];
-                for (int i = 0; i < word.Length; i++)
-                {
-                    float sx = -cardWidth * 0.5f + _slotSize * 0.5f + i * (_slotSize + CardSlotGap);
-                    Image slot = NewImage("Slot" + i, cardRect, slotSprite, new Vector2(_slotSize, _slotSize), new Vector2(sx, 0f));
-                    TextMeshProUGUI label = NewText("Letter", slot.transform, word[i].ToString(), _slotSize * 0.64f, Brown, new Vector2(_slotSize, _slotSize), new Vector2(0f, 1f));
-                    label.alpha = 0.3f;
-                    card.Slots[i] = slot;
-                    card.Labels[i] = label;
-                }
-                _cards[w] = card;
-                _cardOrder.Add(w);
+                NewImage("Mid", _header, headerMidSprite, new Vector2(HeaderW, _headerExtra + 2f), new Vector2(0f, -topH - _headerExtra * 0.5f));
             }
-            LayoutCards(false);
+            NewImage("Bottom", _header, headerBottomSprite, new Vector2(HeaderW, bottomH), new Vector2(0f, -topH - _headerExtra - bottomH * 0.5f));
+
+            // Dải cam (y 225..285 trên ảnh): tiêu đề "FIND THE WORDS".
+            NewText("Title", _header, "FIND THE WORDS", 46f, Color.white, new Vector2(800f, 60f), new Vector2(-40f, HY(255f) + 2f));
+
+            // Dải kem: các thẻ từ, mỗi dòng căn giữa.
+            BuildCards(HY(HeaderSplitPx) - _headerExtra * 0.5f);
         }
 
         private float CardWidth(string word)
@@ -1070,121 +1050,105 @@ namespace PA.TileWord
             return word.Length * _slotSize + (word.Length - 1) * CardSlotGap;
         }
 
-        /// <summary>Xếp các thẻ trong _cardOrder sát nhau từ mép trái dải kem; có thể trượt tới vị trí mới.</summary>
-        private void LayoutCards(bool animate)
+        private float LineWidth(List<int> line)
         {
-            List<RectTransform> rects = new List<RectTransform>();
-            List<Vector2> targets = new List<Vector2>();
-            float x = -StripWidth * 0.5f + StripPadding;
-            for (int k = 0; k < _cardOrder.Count; k++)
+            float width = 0f;
+            for (int k = 0; k < line.Count; k++)
             {
-                WordCard card = _cards[_cardOrder[k]];
-                float cw = card.Rect.sizeDelta.x;
-                rects.Add(card.Rect);
-                targets.Add(new Vector2(x + cw * 0.5f, 0f));
-                x += cw + CardGap;
+                if (k > 0) width += CardGap;
+                width += CardWidth(_words[line[k]]);
             }
-
-            _layoutVersion++;
-            if (!animate)
-            {
-                for (int k = 0; k < rects.Count; k++) rects[k].anchoredPosition = targets[k];
-                return;
-            }
-            StartCoroutine(SlideCards(rects, targets, _layoutVersion));
-        }
-
-        private IEnumerator SlideCards(List<RectTransform> rects, List<Vector2> targets, int version)
-        {
-            List<Vector2> starts = new List<Vector2>();
-            for (int k = 0; k < rects.Count; k++) starts.Add(rects[k].anchoredPosition);
-
-            const float duration = 0.2f;
-            float time = 0f;
-            while (time < duration)
-            {
-                if (version != _layoutVersion) yield break;
-                time += Time.deltaTime;
-                float t = PATween.OutCubic(Mathf.Clamp01(time / duration));
-                for (int k = 0; k < rects.Count; k++)
-                {
-                    if (rects[k] != null) rects[k].anchoredPosition = Vector2.LerpUnclamped(starts[k], targets[k], t);
-                }
-                yield return null;
-            }
-            if (version != _layoutVersion) yield break;
-            for (int k = 0; k < rects.Count; k++)
-            {
-                if (rects[k] != null) rects[k].anchoredPosition = targets[k];
-            }
+            return width;
         }
 
         /// <summary>
-        /// Trên web, Luna không cắt UI theo RectMask2D (cả Image lẫn chữ TextMeshPro vẫn lộ ra ngoài khung).
-        /// Tự ẩn cả ô và chữ của ô không nằm trọn trong dải kem.
+        /// Chia thẻ từ thành dòng: vừa 1 dòng (cho phép thu nhỏ tới MinLineScale) thì giữ 1 dòng,
+        /// không thì xuống dòng theo từ, mỗi dòng căn giữa. Header kéo dài thêm cho các dòng mới.
         /// </summary>
-        private void UpdateCardClipping()
+        private void PrepareCardLines()
         {
-            if (_cards == null || _cardStrip == null) return;
-            float left = -StripWidth * 0.5f;
-            float right = StripWidth * 0.5f;
-            for (int w = 0; w < _cards.Length; w++)
+            _lines = new List<List<int>>();
+            List<int> all = new List<int>();
+            for (int w = 0; w < _words.Length; w++) all.Add(w);
+            float total = LineWidth(all);
+            if (LineMaxWidth / total >= MinLineScale)
             {
-                WordCard card = _cards[w];
-                if (card == null || !card.Rect.gameObject.activeSelf) continue;
-                float cardX = card.Rect.anchoredPosition.x;
-                float scale = card.Rect.localScale.x;
-                for (int i = 0; i < card.Slots.Length; i++)
+                _lines.Add(all);
+                _lineScale = Mathf.Min(1f, LineMaxWidth / total);
+            }
+            else
+            {
+                List<int> current = new List<int>();
+                float width = 0f;
+                for (int w = 0; w < _words.Length; w++)
                 {
-                    RectTransform slot = card.Slots[i].rectTransform;
-                    float center = cardX + slot.anchoredPosition.x * scale;
-                    float half = _slotSize * 0.5f * scale;
-                    bool inside = center - half >= left - 0.5f && center + half <= right + 0.5f;
-                    if (card.Labels[i].enabled != inside) card.Labels[i].enabled = inside;
-                    if (card.Slots[i].enabled != inside) card.Slots[i].enabled = inside;
+                    float cw = CardWidth(_words[w]);
+                    if (current.Count > 0 && width + CardGap + cw > LineMaxWidth)
+                    {
+                        _lines.Add(current);
+                        current = new List<int>();
+                        width = 0f;
+                    }
+                    if (current.Count > 0) width += CardGap;
+                    current.Add(w);
+                    width += cw;
+                }
+                if (current.Count > 0) _lines.Add(current);
+                _lineScale = 1f;
+                for (int l = 0; l < _lines.Count; l++) _lineScale = Mathf.Min(_lineScale, LineMaxWidth / LineWidth(_lines[l]));
+            }
+            _headerExtra = (_lines.Count - 1) * (_slotSize + CardRowGap) * _lineScale;
+        }
+
+        private void BuildCards(float centerY)
+        {
+            RectTransform strip = NewRect("Cards", _header);
+            strip.anchoredPosition = new Vector2(0f, centerY);
+            strip.localScale = new Vector3(_lineScale, _lineScale, 1f);
+
+            _cards = new WordCard[_words.Length];
+            float rowStep = _slotSize + CardRowGap;
+            for (int l = 0; l < _lines.Count; l++)
+            {
+                List<int> line = _lines[l];
+                float y = ((_lines.Count - 1) * 0.5f - l) * rowStep;
+                float x = -LineWidth(line) * 0.5f;
+                for (int k = 0; k < line.Count; k++)
+                {
+                    int w = line[k];
+                    string word = _words[w];
+                    float cardWidth = CardWidth(word);
+                    if (k > 0) x += CardGap;
+
+                    RectTransform cardRect = NewRect("Card_" + word, strip);
+                    cardRect.sizeDelta = new Vector2(cardWidth, _slotSize);
+                    cardRect.anchoredPosition = new Vector2(x + cardWidth * 0.5f, y);
+                    x += cardWidth;
+
+                    WordCard card = new WordCard();
+                    card.Rect = cardRect;
+                    card.Group = cardRect.gameObject.AddComponent<CanvasGroup>();
+                    card.Group.blocksRaycasts = false;
+                    card.Slots = new Image[word.Length];
+                    card.Labels = new TextMeshProUGUI[word.Length];
+                    for (int i = 0; i < word.Length; i++)
+                    {
+                        float sx = -cardWidth * 0.5f + _slotSize * 0.5f + i * (_slotSize + CardSlotGap);
+                        Image slot = NewImage("Slot" + i, cardRect, slotSprite, new Vector2(_slotSize, _slotSize), new Vector2(sx, 0f));
+                        TextMeshProUGUI label = NewText("Letter", slot.transform, word[i].ToString(), _slotSize * 0.64f, Brown, new Vector2(_slotSize, _slotSize), new Vector2(0f, 1f));
+                        label.alpha = 0.3f;
+                        card.Slots[i] = slot;
+                        card.Labels[i] = label;
+                    }
+                    _cards[w] = card;
                 }
             }
         }
 
-        /// <summary>Đưa thẻ của từ vừa tìm lên vị trí đầu (nếu nó đang ở sau/bị che) để chữ bay vào chỗ nhìn thấy.</summary>
-        private void BringCardToFront(int wordIndex)
-        {
-            int pos = _cardOrder.IndexOf(wordIndex);
-            if (pos <= 0) return;
-            _cardOrder.RemoveAt(pos);
-            _cardOrder.Insert(0, wordIndex);
-            LayoutCards(true);
-        }
-
-        /// <summary>Thẻ đã clear: phồng nhẹ rồi thu nhỏ + mờ dần, sau đó các thẻ phía sau trượt lên lấp chỗ.</summary>
-        private IEnumerator RemoveCard(int wordIndex)
-        {
-            WordCard card = _cards[wordIndex];
-            yield return new WaitForSeconds(0.25f);
-
-            const float duration = 0.3f;
-            float time = 0f;
-            while (time < duration)
-            {
-                time += Time.deltaTime;
-                float t = Mathf.Clamp01(time / duration);
-                float s = t < 0.3f ? Mathf.Lerp(1f, 1.12f, t / 0.3f) : Mathf.Lerp(1.12f, 0f, PATween.InCubic((t - 0.3f) / 0.7f));
-                card.Rect.localScale = new Vector3(s, s, 1f);
-                card.Group.alpha = 1f - PATween.InCubic(t);
-                yield return null;
-            }
-            card.Rect.gameObject.SetActive(false);
-
-            _cardOrder.Remove(wordIndex);
-            LayoutCards(true);
-        }
-
-
         private void BuildBoard()
         {
-            // Board nằm ngay dưới vùng thẻ từ (vị trí phụ thuộc số hàng thẻ).
-            float cardsBottom = _header.anchoredPosition.y - _header.sizeDelta.y * 0.5f - _cardsHeight;
-            float boardTop = cardsBottom - 18f;
+            // Board nằm ngay dưới header (header cao thêm khi thẻ từ xuống nhiều dòng).
+            float boardTop = HeaderTop - HeaderH - _headerExtra - 18f;
             float boardHeight = CellH * GridSize;
             _board = NewRect("Board", _root);
             _board.sizeDelta = new Vector2(CellW * GridSize, boardHeight);
