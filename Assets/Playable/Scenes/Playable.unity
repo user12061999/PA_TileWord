@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &152287229
+--- !u!1 &1389701165
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,98 +127,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 152287231}
-  - component: {fileID: 152287230}
-  m_Layer: 0
-  m_Name: PlayableGame
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &152287230
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 152287229}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 37f8e5e80473955419b33d29fd55a616, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  backgroundSprite: {fileID: 21300000, guid: 008aae7911f5f0848aec729775a6058d, type: 3}
-  tileSprite: {fileID: 21300000, guid: f819a1f5e9d6c724b9d63f5367efb0da, type: 3}
-  slotSprite: {fileID: 21300000, guid: 8c4605fbc1f44bf42add0c926a409445, type: 3}
-  headerTopSprite: {fileID: 21300000, guid: a7755a828a7aed044adf88b621979e0b, type: 3}
-  headerMidSprite: {fileID: 21300000, guid: a2a05ed8c2ea53247903a0c3c431c114, type: 3}
-  headerBottomSprite: {fileID: 21300000, guid: 440b7f5366ec9c241a34d67610785416, type: 3}
-  logoSprite: {fileID: 21300000, guid: 82b45892afdbed84cba0040df8dba53d, type: 3}
-  buttonSprite: {fileID: 21300000, guid: 08d7c8d8c7fcac64dabbfbfdfb1f3e55, type: 3}
-  hardButtonSprite: {fileID: 21300000, guid: fcddaaca916cbd040bb7cce302bf45d4, type: 3}
-  handSprite: {fileID: 21300000, guid: 7ed0bf73b0adc4d89b35fd3708dec02c, type: 3}
-  sparkleSprite: {fileID: 21300000, guid: 85008451fab0b2249ad978d5c0f40bf8, type: 3}
-  starOnSprite: {fileID: 21300000, guid: ac367f079f85df044b58bdf06a84c63c, type: 3}
-  starOffSprite: {fileID: 21300000, guid: 64fe7ca6aaa0c4944a25700f89aed511, type: 3}
-  crossSprite: {fileID: 21300000, guid: eba0a5ee43ad8f14da3e9489dd7884fe, type: 3}
-  pillSprite: {fileID: 21300000, guid: 53d002205d6aca84ead82a3b9c48eeec, type: 3}
-  flashEdgesSprite: {fileID: 21300000, guid: f920e2e9521513449be666c6db995385, type: 3}
-  trayWarningSprite: {fileID: 21300000, guid: 0fa7d796e84fbed4d91ea75953565b34, type: 3}
-  winPanelSprite: {fileID: 21300000, guid: 456c738fee05f914399edf9117ebc677, type: 3}
-  losePanelSprite: {fileID: 21300000, guid: 00f9a721a5aa34e498eeae2f4b392888, type: 3}
-  loseIconSprite: {fileID: 21300000, guid: e57a4846a9bc16c4197bf57abf1a4126, type: 3}
-  font: {fileID: 11400000, guid: fa26d508e002ade4fb69cb17da03e300, type: 2}
-  music: {fileID: 8300000, guid: 5983bf0a85d036f47986b57127c0ffae, type: 3}
-  sfxTap: {fileID: 8300000, guid: d808a5dc73a632d4ea0a158629dbf1ca, type: 3}
-  sfxWrong: {fileID: 8300000, guid: 3d4b98ebef03cd747a203c2ff1237573, type: 3}
-  sfxWoodLand: {fileID: 8300000, guid: 61d643d5f28f3064585b8c1bed7034fd, type: 3}
-  sfxHeaderDrop: {fileID: 8300000, guid: 8ff5f03f02e45c347be66bbfaecd0323, type: 3}
-  sfxStreak: {fileID: 8300000, guid: f0169daf6a8de3543bfdf3aa066a643f, type: 3}
-  sfxSlotFill: {fileID: 8300000, guid: 1b3a9aa133dd17e4a80144d16ef86d0b, type: 3}
-  sfxWord: {fileID: 8300000, guid: 8db4e5b130b97684faf58b30011cc8cf, type: 3}
-  sfxWin: {fileID: 8300000, guid: 5ad54e4fe5d6de14ab12740dd7d4fe6f, type: 3}
-  sfxButton: {fileID: 8300000, guid: 43778771ca132fe44baa768ab4be8bc2, type: 3}
-  musicVolume: 0.45
-  introDuration: 1.4
-  idleHintDelay: 5
-  categoryTitle: FRUITS
-  words:
-  - PEAR
-  - LIME
-  - MELON
-  - MANGO
-  - Fui
-  - fodje
-  wordsToWin: 3
-  levelNumber: 20
-  timeLimit: 180
---- !u!4 &152287231
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 152287229}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &332775521
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 332775524}
-  - component: {fileID: 332775523}
-  - component: {fileID: 332775522}
+  - component: {fileID: 1389701168}
+  - component: {fileID: 1389701167}
+  - component: {fileID: 1389701166}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -226,21 +137,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!81 &332775522
+--- !u!81 &1389701166
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 332775521}
+  m_GameObject: {fileID: 1389701165}
   m_Enabled: 1
---- !u!20 &332775523
+--- !u!20 &1389701167
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 332775521}
+  m_GameObject: {fileID: 1389701165}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -285,13 +196,103 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &332775524
+--- !u!4 &1389701168
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 332775521}
+  m_GameObject: {fileID: 1389701165}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1980519054
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1980519056}
+  - component: {fileID: 1980519055}
+  m_Layer: 0
+  m_Name: PlayableGame
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1980519055
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980519054}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37f8e5e80473955419b33d29fd55a616, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  backgroundSprite: {fileID: 21300000, guid: 008aae7911f5f0848aec729775a6058d, type: 3}
+  tileSprite: {fileID: 21300000, guid: f819a1f5e9d6c724b9d63f5367efb0da, type: 3}
+  slotSprite: {fileID: 21300000, guid: 8c4605fbc1f44bf42add0c926a409445, type: 3}
+  headerTopSprite: {fileID: 21300000, guid: a7755a828a7aed044adf88b621979e0b, type: 3}
+  headerMidSprite: {fileID: 21300000, guid: a2a05ed8c2ea53247903a0c3c431c114, type: 3}
+  headerBottomSprite: {fileID: 21300000, guid: 440b7f5366ec9c241a34d67610785416, type: 3}
+  logoSprite: {fileID: 21300000, guid: 82b45892afdbed84cba0040df8dba53d, type: 3}
+  buttonSprite: {fileID: 21300000, guid: 08d7c8d8c7fcac64dabbfbfdfb1f3e55, type: 3}
+  hardButtonSprite: {fileID: 21300000, guid: fcddaaca916cbd040bb7cce302bf45d4, type: 3}
+  handSprite: {fileID: 21300000, guid: 7ed0bf73b0adc4d89b35fd3708dec02c, type: 3}
+  sparkleSprite: {fileID: 21300000, guid: 85008451fab0b2249ad978d5c0f40bf8, type: 3}
+  starOnSprite: {fileID: 21300000, guid: ac367f079f85df044b58bdf06a84c63c, type: 3}
+  starOffSprite: {fileID: 21300000, guid: 64fe7ca6aaa0c4944a25700f89aed511, type: 3}
+  crossSprite: {fileID: 21300000, guid: eba0a5ee43ad8f14da3e9489dd7884fe, type: 3}
+  pillCapSprite: {fileID: 21300000, guid: 742663ab69361c548a57f0260ea1dc00, type: 3}
+  flashEdgesSprite: {fileID: 21300000, guid: f920e2e9521513449be666c6db995385, type: 3}
+  trayWarningSprite: {fileID: 21300000, guid: 0fa7d796e84fbed4d91ea75953565b34, type: 3}
+  winPanelSprite: {fileID: 21300000, guid: 456c738fee05f914399edf9117ebc677, type: 3}
+  losePanelSprite: {fileID: 21300000, guid: 00f9a721a5aa34e498eeae2f4b392888, type: 3}
+  loseIconSprite: {fileID: 21300000, guid: e57a4846a9bc16c4197bf57abf1a4126, type: 3}
+  font: {fileID: 11400000, guid: fa26d508e002ade4fb69cb17da03e300, type: 2}
+  music: {fileID: 8300000, guid: 5983bf0a85d036f47986b57127c0ffae, type: 3}
+  sfxTap: {fileID: 8300000, guid: d808a5dc73a632d4ea0a158629dbf1ca, type: 3}
+  sfxWrong: {fileID: 8300000, guid: 3d4b98ebef03cd747a203c2ff1237573, type: 3}
+  sfxWoodLand: {fileID: 8300000, guid: 61d643d5f28f3064585b8c1bed7034fd, type: 3}
+  sfxHeaderDrop: {fileID: 8300000, guid: 8ff5f03f02e45c347be66bbfaecd0323, type: 3}
+  sfxStreak: {fileID: 8300000, guid: f0169daf6a8de3543bfdf3aa066a643f, type: 3}
+  sfxSlotFill: {fileID: 8300000, guid: 1b3a9aa133dd17e4a80144d16ef86d0b, type: 3}
+  sfxWord: {fileID: 8300000, guid: 8db4e5b130b97684faf58b30011cc8cf, type: 3}
+  sfxWin: {fileID: 8300000, guid: 5ad54e4fe5d6de14ab12740dd7d4fe6f, type: 3}
+  sfxButton: {fileID: 8300000, guid: 43778771ca132fe44baa768ab4be8bc2, type: 3}
+  musicVolume: 0.45
+  introDuration: 1.4
+  idleHintDelay: 5
+  categoryTitle: FRUITS
+  words:
+  - PEAR
+  - LIME
+  - MELON
+  - MANGO
+  wordsToWin: 3
+  levelNumber: 20
+  timeLimit: 180
+  gridColumns: 7
+  gridRows: 6
+  traySlots: 7
+--- !u!4 &1980519056
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980519054}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -304,5 +305,5 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 332775524}
-  - {fileID: 152287231}
+  - {fileID: 1389701168}
+  - {fileID: 1980519056}

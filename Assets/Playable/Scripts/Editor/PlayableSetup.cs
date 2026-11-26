@@ -78,9 +78,6 @@ namespace PA.TileWord.EditorTools
 
         private static readonly string[] MediumTextures = { "lose-icon-only.png" };
 
-        // Ô bo tròn TrayWarningBar (128px, bán kính góc ~44px) dùng kiểu Sliced cho pill thanh sao / thông báo.
-        private const string SlicedTexture = "TrayWarningBar.png";
-        private static readonly Vector4 SlicedBorder = new Vector4(46f, 46f, 46f, 46f);
 
         private static void ConfigureTextures()
         {
@@ -101,7 +98,6 @@ namespace PA.TileWord.EditorTools
                 if (importer.spriteImportMode != SpriteImportMode.Single) { importer.spriteImportMode = SpriteImportMode.Single; changed = true; }
                 if (importer.mipmapEnabled) { importer.mipmapEnabled = false; changed = true; }
                 if (importer.maxTextureSize != maxSize) { importer.maxTextureSize = maxSize; changed = true; }
-                if (file == SlicedTexture && importer.spriteBorder != SlicedBorder) { importer.spriteBorder = SlicedBorder; changed = true; }
                 if (changed) importer.SaveAndReimport();
             }
         }
@@ -205,7 +201,7 @@ namespace PA.TileWord.EditorTools
             game.starOnSprite = LoadSprite("symc_star");
             game.starOffSprite = LoadSprite("sym_star");
             game.crossSprite = LoadSprite("cross");
-            game.pillSprite = LoadSprite("TrayWarningBar");
+            game.pillCapSprite = LoadSprite("TrayWarningBarCap");
             game.flashEdgesSprite = LoadSprite("TrayWarningEdges");
             game.trayWarningSprite = LoadSprite("LetterTrayWarning");
             game.winPanelSprite = LoadSprite("ResultNicePopupPanel");

@@ -34,7 +34,7 @@ namespace PA.TileWord
         public Sprite starOnSprite;
         public Sprite starOffSprite;
         public Sprite crossSprite;       // cross.png (trắng, tô đỏ trong code)
-        public Sprite pillSprite;        // TrayWarningBar: ô bo tròn trắng, dùng kiểu Sliced
+        public Sprite pillCapSprite;     // mép trái 48x128 cắt từ TrayWarningBar (ô bo góc trắng) để ghép nền bo góc
         public Sprite flashEdgesSprite;  // TrayWarningEdges: viền màn hình khi chọn sai
         public Sprite trayWarningSprite;
         public Sprite winPanelSprite;
@@ -87,19 +87,41 @@ namespace PA.TileWord
         [Range(20, 600)]
         public int timeLimit = 180;
 
+        [LunaPlaygroundField("Grid columns", 3, "Gameplay")]
+        [LunaPlaygroundFieldStep(1)]
+        [Range(MinGrid, MaxGrid)]
+        [Tooltip("Số cột của bảng chữ. Board tự thu nhỏ cho vừa màn hình.")]
+        public int gridColumns = 7;
+
+        [LunaPlaygroundField("Grid rows", 4, "Gameplay")]
+        [LunaPlaygroundFieldStep(1)]
+        [Range(MinGrid, MaxGrid)]
+        [Tooltip("Số hàng của bảng chữ. Board tự thu nhỏ cho vừa màn hình.")]
+        public int gridRows = 6;
+
+        [LunaPlaygroundField("Tray slots (wrong letters)", 5, "Gameplay")]
+        [LunaPlaygroundFieldStep(1)]
+        [Range(MinTray, MaxTray)]
+        [Tooltip("Số ô khay chứa chữ chọn sai. Khay đầy thì thua (hỏi thử lại).")]
+        public int traySlots = 7;
+
         // ---------------------------------------------------------------- layout constants
         private const float RefWidth = 1080f;
         private const float RefHeight = 1920f;
 
-        private const int Cols = 7;
-        private const int Rows = 6;
+        private const int MinGrid = 4;
+        private const int MaxGrid = 9;
+        private const int MinTray = 3;
+        private const int MaxTray = 10;
+        // Bề rộng tối đa của board / khay trên màn hình 1080 (thừa thì thu nhỏ).
+        private const float MaxRowWidth = 1040f;
+
         private const float CellW = 138f;
         private const float CellH = 142f;
         private const float TileW = 128f;
         private const float TileH = 139f;
         private const float TileFont = 84f;
 
-        private const int TraySize = 7;
         private const float TraySlot = 122f;
         private const float TrayGap = 12f;
 
@@ -137,6 +159,7 @@ namespace PA.TileWord
         };
 
         private static readonly Color Brown = new Color32(107, 58, 30, 255);
+        private static readonly Color TimerWarnColor = new Color32(214, 40, 30, 255);
         private static readonly Color PendingColor = new Color(0.42f, 0.23f, 0.12f, 0.28f);
         private static readonly Color IncomingColor = new Color(0.42f, 0.23f, 0.12f, 0.5f);
         private static readonly Color WordDoneColor = new Color32(58, 150, 40, 255);
@@ -178,6 +201,10 @@ namespace PA.TileWord
         private float _boardTop;
         private float _boardScale = 1f;
         private float _messageY;
+        private int _cols;
+        private int _rows;
+        private int _traySize;
+        private float _trayScale = 1f;
         private TextMeshProUGUI[][] _lineLabels;
 
         private Image[] _traySlots;
@@ -215,6 +242,7 @@ namespace PA.TileWord
         private void Start()
         {
             Application.targetFrameRate = 60;
+            ReadGridConfig();
             PrepareWords();
             PrepareLineLayout();
             ComputeLayout();
@@ -262,7 +290,7 @@ namespace PA.TileWord
             float now = Time.time;
             if (_trayWarnings != null)
             {
-                bool warn = _trayCount >= TraySize - 2;
+                bool warn = _trayCount >= Mathf.Max(1, _traySize - 2);
                 float a = 0.55f + Mathf.Sin(now * 8f) * 0.45f;
                 for (int i = 0; i < _trayWarnings.Length; i++)
                 {
@@ -276,6 +304,14 @@ namespace PA.TileWord
                 float s = 1f + Mathf.Sin(now * 5f) * 0.05f;
                 _ctaButton.localScale = new Vector3(s, s, 1f);
             }
+        }
+
+        /// <summary>Kích thước board và khay từ Luna Playground, kẹp trong khoảng hợp lệ.</summary>
+        private void ReadGridConfig()
+        {
+            _cols = Mathf.Clamp(gridColumns, MinGrid, MaxGrid);
+            _rows = Mathf.Clamp(gridRows, MinGrid, MaxGrid);
+            _traySize = Mathf.Clamp(traySlots, MinTray, MaxTray);
         }
 
         // ================================================================ words config
@@ -416,17 +452,17 @@ namespace PA.TileWord
 
             // Ô gỗ rơi lần lượt kiểu "rắn": hàng dưới trái -> phải, hàng trên phải -> trái...
             const float fallTime = 0.4f;
-            int maxOrder = Rows * Cols - 1;
+            int maxOrder = _rows * _cols - 1;
             float step = Mathf.Max(0.01f, (introDuration - fallTime) / maxOrder);
-            for (int r = 0; r < Rows; r++)
+            for (int r = 0; r < _rows; r++)
             {
-                for (int c = 0; c < Cols; c++)
+                for (int c = 0; c < _cols; c++)
                 {
                     LetterTile tile = _tiles[r, c];
-                    int rowFromBottom = Rows - 1 - r;
-                    int xOrder = rowFromBottom % 2 == 0 ? c : Cols - 1 - c;
+                    int rowFromBottom = _rows - 1 - r;
+                    int xOrder = rowFromBottom % 2 == 0 ? c : _cols - 1 - c;
                     Vector2 to = CellPosition(r, c);
-                    tile.FallTo(to + new Vector2(0f, 1500f), to, (rowFromBottom * Cols + xOrder) * step, fallTime);
+                    tile.FallTo(to + new Vector2(0f, 1500f), to, (rowFromBottom * _cols + xOrder) * step, fallTime);
                 }
             }
 
@@ -455,7 +491,7 @@ namespace PA.TileWord
                 if (!trayShown && time >= introDuration * 0.6f)
                 {
                     trayShown = true;
-                    StartCoroutine(PATween.Scale(_trayLayer, Vector3.zero, Vector3.one, 0.35f, PATween.OutBack));
+                    StartCoroutine(PATween.Scale(_trayLayer, Vector3.zero, new Vector3(_trayScale, _trayScale, 1f), 0.35f, PATween.OutBack));
                     StartCoroutine(PATween.Scale(_starBar, Vector3.zero, Vector3.one, 0.35f, PATween.OutBack));
                 }
                 yield return null;
@@ -521,7 +557,7 @@ namespace PA.TileWord
             StartCoroutine(FlashRed(++_flashVersion));
             StartCoroutine(CrossRoutine(tile.Rect.anchoredPosition));
 
-            if (_trayCount >= TraySize) Lose();
+            if (_trayCount >= _traySize) Lose();
 
             _flyingLetters++;
             StartCoroutine(FallToTray(tile, slot));
@@ -564,13 +600,13 @@ namespace PA.TileWord
         {
             LetterTile best = null;
             float bestDist = float.MaxValue;
-            for (int r = 0; r < Rows; r++)
+            for (int r = 0; r < _rows; r++)
             {
-                for (int c = 0; c < Cols; c++)
+                for (int c = 0; c < _cols; c++)
                 {
                     LetterTile t = _tiles[r, c];
                     if (t == null || t.Used || t.Letter != need) continue;
-                    float d = Mathf.Abs(r - (Rows - 1) * 0.5f) + Mathf.Abs(c - (Cols - 1) * 0.5f);
+                    float d = Mathf.Abs(r - (_rows - 1) * 0.5f) + Mathf.Abs(c - (_cols - 1) * 0.5f);
                     if (d < bestDist)
                     {
                         bestDist = d;
@@ -585,17 +621,17 @@ namespace PA.TileWord
         private void BuildBoard()
         {
             _board = NewRect("Board", _root);
-            _board.sizeDelta = new Vector2(CellW * Cols, CellH * Rows);
+            _board.sizeDelta = new Vector2(CellW * _cols, CellH * _rows);
             _board.localScale = new Vector3(_boardScale, _boardScale, 1f);
-            _board.anchoredPosition = new Vector2(0f, _boardTop - CellH * Rows * _boardScale * 0.5f);
+            _board.anchoredPosition = new Vector2(0f, _boardTop - CellH * _rows * _boardScale * 0.5f);
 
             // Board cố định (seed cố định): chữ nhiễu ở mọi ô, rồi đặt đủ chữ của 2 từ đầu vào các ô khác nhau.
             PARandom rng = new PARandom(BoardSeed);
-            char[,] letters = new char[Rows, Cols];
-            bool[,] reserved = new bool[Rows, Cols];
-            for (int r = 0; r < Rows; r++)
+            char[,] letters = new char[_rows, _cols];
+            bool[,] reserved = new bool[_rows, _cols];
+            for (int r = 0; r < _rows; r++)
             {
-                for (int c = 0; c < Cols; c++) letters[r, c] = _decoys[rng.Range(0, _decoys.Length)];
+                for (int c = 0; c < _cols; c++) letters[r, c] = _decoys[rng.Range(0, _decoys.Length)];
             }
             int seeded = Mathf.Min(2, _target);
             for (int w = 0; w < seeded; w++)
@@ -605,11 +641,11 @@ namespace PA.TileWord
                 {
                     for (int attempt = 0; attempt < 300; attempt++)
                     {
-                        int r = rng.Range(0, Rows);
-                        int c = rng.Range(0, Cols);
+                        int r = rng.Range(0, _rows);
+                        int c = rng.Range(0, _cols);
                         if (reserved[r, c]) continue;
                         // Từ tutorial tránh viền ngoài để bàn tay chỉ dễ nhìn.
-                        if (w == 0 && attempt < 200 && (r == 0 || c == 0 || r == Rows - 1 || c == Cols - 1)) continue;
+                        if (w == 0 && attempt < 200 && (r == 0 || c == 0 || r == _rows - 1 || c == _cols - 1)) continue;
                         reserved[r, c] = true;
                         letters[r, c] = word[i];
                         break;
@@ -617,19 +653,19 @@ namespace PA.TileWord
                 }
             }
 
-            _tiles = new LetterTile[Rows, Cols];
-            for (int r = 0; r < Rows; r++)
+            _tiles = new LetterTile[_rows, _cols];
+            for (int r = 0; r < _rows; r++)
             {
-                for (int c = 0; c < Cols; c++)
+                for (int c = 0; c < _cols; c++)
                 {
                     _tiles[r, c] = CreateTile(letters[r, c], r, c, CellPosition(r, c));
                 }
             }
         }
 
-        private static Vector2 CellPosition(int row, int col)
+        private Vector2 CellPosition(int row, int col)
         {
-            return new Vector2((col - (Cols - 1) * 0.5f) * CellW, ((Rows - 1) * 0.5f - row) * CellH);
+            return new Vector2((col - (_cols - 1) * 0.5f) * CellW, ((_rows - 1) * 0.5f - row) * CellH);
         }
 
         private LetterTile CreateTile(char letter, int row, int col, Vector2 pos)
@@ -665,10 +701,10 @@ namespace PA.TileWord
         private void RefillBoard()
         {
             List<LetterTile> spawned = new List<LetterTile>();
-            for (int c = 0; c < Cols; c++)
+            for (int c = 0; c < _cols; c++)
             {
-                int write = Rows - 1;
-                for (int r = Rows - 1; r >= 0; r--)
+                int write = _rows - 1;
+                for (int r = _rows - 1; r >= 0; r--)
                 {
                     LetterTile tile = _tiles[r, c];
                     if (tile == null) continue;
@@ -715,9 +751,9 @@ namespace PA.TileWord
             {
                 char ch = upcoming[k];
                 LetterTile found = null;
-                for (int r = 0; r < Rows && found == null; r++)
+                for (int r = 0; r < _rows && found == null; r++)
                 {
-                    for (int c = 0; c < Cols; c++)
+                    for (int c = 0; c < _cols; c++)
                     {
                         LetterTile t = _tiles[r, c];
                         if (t != null && t.Letter == ch && !claimed.Contains(t))
@@ -742,9 +778,9 @@ namespace PA.TileWord
             }
             if (candidates.Count == 0)
             {
-                for (int r = 0; r < Rows; r++)
+                for (int r = 0; r < _rows; r++)
                 {
-                    for (int c = 0; c < Cols; c++)
+                    for (int c = 0; c < _cols; c++)
                     {
                         LetterTile t = _tiles[r, c];
                         if (t == null || claimed.Contains(t) || keep.IndexOf(t.Letter) >= 0) continue;
@@ -879,7 +915,8 @@ namespace PA.TileWord
             Vector2 p2 = _fxLayer.InverseTransformPoint(slot.rectTransform.position);
             Vector2 p1 = new Vector2((p0.x + p2.x) * 0.5f, Mathf.Max(p0.y, p2.y) + 140f);
             float startScale = tile.Rect.localScale.x;
-            float endScale = TraySlot * 0.94f / TileH;
+            float slotScale = TraySlot * 0.94f / TileH;
+            float endScale = slotScale * _trayScale;
             const float duration = 0.45f;
             time = 0f;
             while (time < duration)
@@ -896,7 +933,7 @@ namespace PA.TileWord
 
             tile.Rect.SetParent(slot.transform, false);
             tile.Rect.anchoredPosition = Vector2.zero;
-            tile.Rect.localScale = new Vector3(endScale, endScale, 1f);
+            tile.Rect.localScale = new Vector3(slotScale, slotScale, 1f);
             tile.Background.color = LetterTile.NormalColor;
             tile.Background.raycastTarget = false;
             Play(sfxWoodLand, 0.8f, 1f);
@@ -1289,11 +1326,17 @@ namespace PA.TileWord
         /// <summary>Vị trí khay, board, ô thông báo phụ thuộc chiều cao header; board thu nhỏ nếu thiếu chỗ.</summary>
         private void ComputeLayout()
         {
+            float trayWidth = _traySize * TraySlot + (_traySize - 1) * TrayGap;
+            _trayScale = Mathf.Min(1f, MaxRowWidth / trayWidth);
+            float trayHalf = TraySlot * 0.5f * _trayScale;
+
             float headerBottom = HeaderTop - HeaderH - _headerExtra;
-            _trayY = headerBottom - 30f - TraySlot * 0.5f;
-            _boardTop = _trayY - TraySlot * 0.5f - 40f;
-            float boardH = Rows * CellH;
-            _boardScale = Mathf.Clamp((_boardTop - MinBoardBottom) / boardH, 0.6f, 1f);
+            _trayY = headerBottom - 30f - trayHalf;
+            _boardTop = _trayY - trayHalf - 40f;
+            float boardH = _rows * CellH;
+            float fitHeight = (_boardTop - MinBoardBottom) / boardH;
+            float fitWidth = MaxRowWidth / (_cols * CellW);
+            _boardScale = Mathf.Clamp(Mathf.Min(fitHeight, fitWidth), 0.4f, 1f);
             _messageY = _boardTop - boardH * _boardScale - 62f;
         }
 
@@ -1345,18 +1388,19 @@ namespace PA.TileWord
             int m = seconds / 60;
             int s = seconds % 60;
             _timerText.text = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
-            _timerText.color = seconds <= 10 ? new Color32(214, 40, 30, 255) : Brown;
+            // Luna build dùng compiler cũ: ép kiểu rõ ràng, không trộn Color32 và Color trong toán tử ?:.
+            _timerText.color = seconds <= 10 ? TimerWarnColor : Brown;
         }
 
         private void BuildTray()
         {
             _trayLayer = NewRect("Tray", _root);
             _trayLayer.anchoredPosition = new Vector2(0f, _trayY);
-            _traySlots = new Image[TraySize];
-            _trayWarnings = new Image[TraySize];
-            for (int i = 0; i < TraySize; i++)
+            _traySlots = new Image[_traySize];
+            _trayWarnings = new Image[_traySize];
+            for (int i = 0; i < _traySize; i++)
             {
-                float x = (i - (TraySize - 1) * 0.5f) * (TraySlot + TrayGap);
+                float x = (i - (_traySize - 1) * 0.5f) * (TraySlot + TrayGap);
                 Image warn = NewImage("Warn" + i, _trayLayer, trayWarningSprite, new Vector2(TraySlot * 1.25f, TraySlot * 1.25f), new Vector2(x, 0f));
                 warn.enabled = false;
                 _trayWarnings[i] = warn;
@@ -1369,10 +1413,7 @@ namespace PA.TileWord
         private void BuildStarBar()
         {
             float width = _target * StarSpacing + 70f;
-            Image pill = NewImage("StarBar", _root, pillSprite, new Vector2(width, 108f), new Vector2(0f, StarBarY));
-            pill.type = Image.Type.Sliced;
-            pill.color = new Color(0.22f, 0.04f, 0.33f, 0.62f);
-            _starBar = pill.rectTransform;
+            _starBar = NewRounded("StarBar", _root, new Vector2(width, 108f), new Vector2(0f, StarBarY), new Color(0.22f, 0.04f, 0.33f, 0.62f));
 
             _stars = new Image[_target];
             for (int k = 0; k < _target; k++)
@@ -1393,17 +1434,16 @@ namespace PA.TileWord
             _rootTop.sizeDelta = new Vector2(RefWidth, RefHeight);
             _fxLayer = NewRect("FxLayer", _rootTop);
 
-            Image pill = NewImage("Message", _rootTop, pillSprite, new Vector2(760f, 86f), new Vector2(0f, _messageY));
-            pill.type = Image.Type.Sliced;
-            pill.color = new Color(0.25f, 0.06f, 0.36f, 0.78f);
-            _messageGroup = pill.gameObject.AddComponent<CanvasGroup>();
-            _messageGroup.blocksRaycasts = false;
-            _message = NewText("Text", pill.transform, "", 44f, Color.white, new Vector2(720f, 80f), new Vector2(0f, 2f));
-
             Image hand = NewImage("Hand", _rootTop, handSprite, new Vector2(150f, 150f * 173f / 181f), Vector2.zero);
             _hand = hand.rectTransform;
             _hand.pivot = new Vector2(0.1f, 0.92f);
             _hand.gameObject.SetActive(false);
+
+            // Ô thông báo vẽ SAU bàn tay: khi tay chỉ ô hàng dưới cùng, thân tay nằm dưới ô thông báo, chữ không bị che.
+            RectTransform pill = NewRounded("Message", _rootTop, new Vector2(760f, 86f), new Vector2(0f, _messageY), new Color(0.25f, 0.06f, 0.36f, 0.92f));
+            _messageGroup = pill.gameObject.AddComponent<CanvasGroup>();
+            _messageGroup.blocksRaycasts = false;
+            _message = NewText("Text", pill.transform, "", 44f, Color.white, new Vector2(720f, 80f), new Vector2(0f, 2f));
 
             RectTransform flashRect = NewRect("RedFlash", _canvasRect);
             Stretch(flashRect);
@@ -1578,6 +1618,33 @@ namespace PA.TileWord
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = Vector2.zero;
+            return rt;
+        }
+
+        /// <summary>
+        /// Nền bo góc ghép từ 3 ảnh thường: mép trái | khối giữa | mép phải (mép trái lật ngang).
+        /// Không dùng Image.Type.Sliced: bản build Luna web vẽ Sliced thành hình chữ nhật góc vuông.
+        /// </summary>
+        private RectTransform NewRounded(string name, Transform parent, Vector2 size, Vector2 pos, Color color)
+        {
+            RectTransform rt = NewRect(name, parent);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = pos;
+
+            float h = size.y;
+            float capW = Mathf.Min(h * 48f / 128f, size.x * 0.5f);
+            float half = size.x * 0.5f;
+            Image left = NewImage("CapL", rt, pillCapSprite, new Vector2(capW, h), new Vector2(-half + capW * 0.5f, 0f));
+            left.color = color;
+            Image right = NewImage("CapR", rt, pillCapSprite, new Vector2(capW, h), new Vector2(half - capW * 0.5f, 0f));
+            right.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+            right.color = color;
+            float midW = size.x - capW * 2f;
+            if (midW > 0f)
+            {
+                Image mid = NewImage("Mid", rt, null, new Vector2(midW, h), Vector2.zero);
+                mid.color = color;
+            }
             return rt;
         }
 
